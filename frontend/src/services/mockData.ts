@@ -1,5 +1,39 @@
 import type { Pool, Opportunity, PlatformStats, Chain, TrendingPool } from '../types';
 
+// Seeded random number generator for deterministic mock data
+// This ensures the same data is generated on every page load
+class SeededRandom {
+  private seed: number;
+
+  constructor(seed: number = 12345) {
+    this.seed = seed;
+  }
+
+  // Linear congruential generator
+  next(): number {
+    this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
+    return this.seed / 0x7fffffff;
+  }
+
+  // Random number in range with optional decimal places
+  range(min: number, max: number, decimals = 2): number {
+    return Number((this.next() * (max - min) + min).toFixed(decimals));
+  }
+
+  // Random boolean with probability threshold
+  bool(threshold = 0.5): boolean {
+    return this.next() < threshold;
+  }
+
+  // Random integer in range
+  int(min: number, max: number): number {
+    return Math.floor(this.next() * (max - min + 1)) + min;
+  }
+}
+
+// Global seeded random instance - same seed = same data every time
+const rng = new SeededRandom(42);
+
 // Real DeFi protocols and their categories
 const protocols = [
   { name: 'aave-v3', displayName: 'Aave V3', category: 'lending' },
@@ -103,9 +137,9 @@ const rewardTokens: Record<string, string[]> = {
   'rocket-pool': [],
 };
 
-// Generate a random number in range with optional decimal places
+// Generate a random number in range with optional decimal places (uses seeded RNG)
 function random(min: number, max: number, decimals = 2): number {
-  return Number((Math.random() * (max - min) + min).toFixed(decimals));
+  return rng.range(min, max, decimals);
 }
 
 // Generate unique pool ID
@@ -123,13 +157,13 @@ function generatePools(): Pool[] {
   for (const protocol of lendingProtocols) {
     for (const chain of chains) {
       // Skip some chain/protocol combinations randomly
-      if (Math.random() > 0.6) continue;
+      if (rng.next() > 0.6) continue;
 
       // Stablecoin lending
-      for (const token of tokens.stablecoins.slice(0, Math.floor(Math.random() * 8) + 3)) {
-        if (Math.random() > 0.7) continue;
+      for (const token of tokens.stablecoins.slice(0, Math.floor(rng.next() * 8) + 3)) {
+        if (rng.next() > 0.7) continue;
         const baseApy = random(2, 12) * chain.apyMultiplier;
-        const rewardApy = Math.random() > 0.5 ? random(0.5, 5) : 0;
+        const rewardApy = rng.next() > 0.5 ? random(0.5, 5) : 0;
         const tvl = random(1000000, 500000000) * chain.tvlMultiplier;
 
         pools.push({
@@ -160,10 +194,10 @@ function generatePools(): Pool[] {
       }
 
       // Major token lending (ETH, WBTC, etc.)
-      for (const token of tokens.majors.slice(0, Math.floor(Math.random() * 5) + 2)) {
-        if (Math.random() > 0.6) continue;
+      for (const token of tokens.majors.slice(0, Math.floor(rng.next() * 5) + 2)) {
+        if (rng.next() > 0.6) continue;
         const baseApy = random(1, 8) * chain.apyMultiplier;
-        const rewardApy = Math.random() > 0.5 ? random(0.3, 3) : 0;
+        const rewardApy = rng.next() > 0.5 ? random(0.3, 3) : 0;
         const tvl = random(5000000, 2000000000) * chain.tvlMultiplier;
 
         pools.push({
@@ -199,7 +233,7 @@ function generatePools(): Pool[] {
   const dexProtocols = protocols.filter(p => p.category === 'dex');
   for (const protocol of dexProtocols) {
     for (const chain of chains) {
-      if (Math.random() > 0.5) continue;
+      if (rng.next() > 0.5) continue;
 
       // Stable pairs
       const stablePairs = [
@@ -207,10 +241,10 @@ function generatePools(): Pool[] {
         ['crvUSD', 'USDC'], ['GHO', 'USDC'], ['USDC', 'DAI', 'USDT'],
       ];
       for (const pair of stablePairs) {
-        if (Math.random() > 0.6) continue;
+        if (rng.next() > 0.6) continue;
         const symbol = pair.join('-');
         const baseApy = random(1, 15) * chain.apyMultiplier;
-        const rewardApy = Math.random() > 0.4 ? random(2, 20) : 0;
+        const rewardApy = rng.next() > 0.4 ? random(2, 20) : 0;
         const tvl = random(500000, 200000000) * chain.tvlMultiplier;
 
         pools.push({
@@ -249,10 +283,10 @@ function generatePools(): Pool[] {
         ['wstETH', 'ETH'], ['rETH', 'ETH'], ['cbETH', 'ETH'],
       ];
       for (const pair of volatilePairs) {
-        if (Math.random() > 0.7) continue;
+        if (rng.next() > 0.7) continue;
         const symbol = pair.join('-');
         const baseApy = random(5, 50) * chain.apyMultiplier;
-        const rewardApy = Math.random() > 0.3 ? random(5, 40) : 0;
+        const rewardApy = rng.next() > 0.3 ? random(5, 40) : 0;
         const tvl = random(100000, 100000000) * chain.tvlMultiplier;
 
         pools.push({
@@ -288,12 +322,12 @@ function generatePools(): Pool[] {
   const stakingProtocols = protocols.filter(p => p.category === 'liquid-staking' || p.category === 'restaking');
   for (const protocol of stakingProtocols) {
     for (const chain of chains.slice(0, 5)) { // Mainly on major chains
-      if (Math.random() > 0.4) continue;
+      if (rng.next() > 0.4) continue;
 
-      for (const token of tokens.lsts.slice(0, Math.floor(Math.random() * 5) + 2)) {
-        if (Math.random() > 0.5) continue;
+      for (const token of tokens.lsts.slice(0, Math.floor(rng.next() * 5) + 2)) {
+        if (rng.next() > 0.5) continue;
         const baseApy = random(3, 8);
-        const rewardApy = Math.random() > 0.6 ? random(1, 10) : 0;
+        const rewardApy = rng.next() > 0.6 ? random(1, 10) : 0;
         const tvl = random(10000000, 5000000000) * chain.tvlMultiplier;
 
         pools.push({
@@ -329,14 +363,14 @@ function generatePools(): Pool[] {
   const yieldProtocols = protocols.filter(p => p.category === 'yield');
   for (const protocol of yieldProtocols) {
     for (const chain of chains) {
-      if (Math.random() > 0.6) continue;
+      if (rng.next() > 0.6) continue;
 
       // Auto-compounding vaults
       const vaultAssets = [...tokens.stablecoins.slice(0, 5), ...tokens.majors.slice(0, 4), ...tokens.lsts.slice(0, 3)];
       for (const token of vaultAssets) {
-        if (Math.random() > 0.75) continue;
+        if (rng.next() > 0.75) continue;
         const baseApy = random(5, 25) * chain.apyMultiplier;
-        const rewardApy = Math.random() > 0.5 ? random(2, 15) : 0;
+        const rewardApy = rng.next() > 0.5 ? random(2, 15) : 0;
         const tvl = random(100000, 50000000) * chain.tvlMultiplier;
 
         pools.push({
@@ -372,11 +406,11 @@ function generatePools(): Pool[] {
   const derivativeProtocols = protocols.filter(p => p.category === 'derivatives');
   for (const protocol of derivativeProtocols) {
     for (const chain of chains.slice(0, 8)) {
-      if (Math.random() > 0.5) continue;
+      if (rng.next() > 0.5) continue;
 
       const derivativeProducts = ['GLP', 'GM-ETH', 'GM-BTC', 'GM-LINK', 'GM-ARB', 'gDAI', 'gUSDC'];
       for (const product of derivativeProducts) {
-        if (Math.random() > 0.6) continue;
+        if (rng.next() > 0.6) continue;
         const baseApy = random(10, 40) * chain.apyMultiplier;
         const rewardApy = random(5, 25);
         const tvl = random(5000000, 500000000) * chain.tvlMultiplier;
@@ -414,13 +448,13 @@ function generatePools(): Pool[] {
   const bridgeProtocols = protocols.filter(p => p.category === 'bridge');
   for (const protocol of bridgeProtocols) {
     for (const chain of chains) {
-      if (Math.random() > 0.5) continue;
+      if (rng.next() > 0.5) continue;
 
       const bridgeAssets = ['USDC', 'USDT', 'ETH', 'DAI'];
       for (const token of bridgeAssets) {
-        if (Math.random() > 0.6) continue;
+        if (rng.next() > 0.6) continue;
         const baseApy = random(2, 12) * chain.apyMultiplier;
-        const rewardApy = Math.random() > 0.4 ? random(1, 8) : 0;
+        const rewardApy = rng.next() > 0.4 ? random(1, 8) : 0;
         const tvl = random(1000000, 100000000) * chain.tvlMultiplier;
 
         pools.push({
@@ -709,8 +743,8 @@ export function generateMockHistory(poolId: string, period: '1h' | '24h' | '7d' 
 
   for (let i = numPoints - 1; i >= 0; i--) {
     const timestamp = new Date(now - i * intervalMs).toISOString();
-    const variance = (Math.random() - 0.5) * 4;
-    const tvlVariance = (Math.random() - 0.5) * 0.15;
+    const variance = (rng.next() - 0.5) * 4;
+    const tvlVariance = (rng.next() - 0.5) * 0.15;
 
     points.push({
       poolId,
