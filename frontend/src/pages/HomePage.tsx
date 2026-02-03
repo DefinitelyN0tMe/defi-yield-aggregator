@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { statsApi, poolsApi, opportunitiesApi } from '../services/api';
-import { StatsCard, PoolCard, OpportunityCard, TVLIcon, PoolsIcon, APYIcon, OpportunitiesIcon } from '../components';
+import { StatsCard, PoolCard, OpportunityCard, TVLIcon, PoolsIcon, APYIcon, OpportunitiesIcon, RefreshIcon } from '../components';
 import { usePoolUpdates } from '../hooks/useWebSocket';
 import { formatNumber } from '../utils/format';
 import { STATS_REFETCH_INTERVAL, POOLS_REFETCH_INTERVAL, TOP_POOLS_LIMIT } from '../utils/constants';
@@ -11,25 +11,35 @@ export function HomePage() {
   const navigate = useNavigate();
 
   // Fetch platform stats
-  const { data: stats } = useQuery({
+  const { data: stats, refetch: refetchStats, isFetching: statsFetching } = useQuery({
     queryKey: ['stats'],
     queryFn: statsApi.get,
     refetchInterval: STATS_REFETCH_INTERVAL,
   });
 
   // Fetch top pools
-  const { data: poolsData, isLoading: poolsLoading } = useQuery({
+  const { data: poolsData, isLoading: poolsLoading, refetch: refetchPools, isFetching: poolsFetching } = useQuery({
     queryKey: ['pools', 'top'],
     queryFn: () => poolsApi.list({ sortBy: 'score', sortOrder: 'desc', limit: TOP_POOLS_LIMIT }),
     refetchInterval: POOLS_REFETCH_INTERVAL,
   });
 
   // Fetch active opportunities
-  const { data: oppsData, isLoading: oppsLoading } = useQuery({
+  const { data: oppsData, isLoading: oppsLoading, refetch: refetchOpps, isFetching: oppsFetching } = useQuery({
     queryKey: ['opportunities', 'active'],
     queryFn: () => opportunitiesApi.list({ activeOnly: true, limit: 4 }),
     refetchInterval: POOLS_REFETCH_INTERVAL,
   });
+
+  // Combined fetching state for sync button
+  const isSyncing = statsFetching || poolsFetching || oppsFetching;
+
+  // Sync all data
+  const handleSync = () => {
+    refetchStats();
+    refetchPools();
+    refetchOpps();
+  };
 
   // Subscribe to real-time pool updates (callback can be used for notifications)
   usePoolUpdates(() => {
@@ -44,11 +54,22 @@ export function HomePage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-        <p className="mt-2 text-gray-400">
-          Track and analyze yield farming opportunities across DeFi protocols
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+          <p className="mt-2 text-gray-400">
+            Track and analyze yield farming opportunities across DeFi protocols
+          </p>
+        </div>
+        <button
+          onClick={handleSync}
+          disabled={isSyncing}
+          className="btn-secondary flex items-center gap-2"
+          title="Refresh all data"
+        >
+          <RefreshIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          {isSyncing ? 'Syncing...' : 'Sync'}
+        </button>
       </div>
 
       {/* Stats Grid */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Pool, PoolFilter } from '../types';
-import { getProtocolUrl, getExplorerUrl } from '../utils/links';
+import { getProtocolUrl, getExplorerUrl, defiLlamaLinks } from '../utils/links';
 import { formatNumber, getScoreColor, getChangeColor } from '../utils/format';
 import { Sparkline, generateSparklineData } from './Sparkline';
 import { ExternalLinkIcon } from './Icons';
@@ -256,7 +256,7 @@ export function PoolTable({
                       </a>
                       <div className="flex items-center gap-2">
                         <a
-                          href={`https://defillama.com/yields?project=${pool.protocol}`}
+                          href={defiLlamaLinks.protocol(pool.protocol)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-gray-400 hover:text-primary-400"

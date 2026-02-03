@@ -51,7 +51,7 @@ export const chainExplorers: Record<string, string> = {
   'base': 'https://basescan.org',
   'bsc': 'https://bscscan.com',
   'avalanche': 'https://snowtrace.io',
-  'fantom': 'https://ftmscan.com',
+  'fantom': 'https://www.oklink.com/fantom',
   'gnosis': 'https://gnosisscan.io',
   'zkSync': 'https://explorer.zksync.io',
   'linea': 'https://lineascan.build',
@@ -66,15 +66,137 @@ export const chainExplorers: Record<string, string> = {
   'kava': 'https://kavascan.com',
 };
 
+// CoinGecko ID mapping for common DeFi tokens
+// CoinGecko uses slug IDs, not symbols
+const coinGeckoIds: Record<string, string> = {
+  // Stablecoins
+  'USDC': 'usd-coin',
+  'USDT': 'tether',
+  'DAI': 'dai',
+  'FRAX': 'frax',
+  'LUSD': 'liquity-usd',
+  'crvUSD': 'crvusd',
+  'GHO': 'gho',
+  'PYUSD': 'paypal-usd',
+  'TUSD': 'true-usd',
+  'BUSD': 'binance-usd',
+  'USDP': 'paxos-standard',
+  'sUSD': 'susd',
+  'MIM': 'magic-internet-money',
+  'DOLA': 'dola-usd',
+  'alUSD': 'alchemix-usd',
+
+  // ETH and LSTs
+  'ETH': 'ethereum',
+  'WETH': 'weth',
+  'stETH': 'lido-staked-ether',
+  'wstETH': 'wrapped-steth',
+  'rETH': 'rocket-pool-eth',
+  'cbETH': 'coinbase-wrapped-staked-eth',
+  'frxETH': 'frax-ether',
+  'sfrxETH': 'staked-frax-ether',
+  'ankrETH': 'ankr-staked-eth',
+  'swETH': 'sweth',
+  'ETHx': 'stader-ethx',
+  'mETH': 'mantle-staked-ether',
+  'eETH': 'ether-fi-staked-eth',
+  'weETH': 'wrapped-eeth',
+  'ezETH': 'renzo-restaked-eth',
+  'pufETH': 'puffer-finance',
+  'rsETH': 'kelp-dao-restaked-eth',
+
+  // BTC
+  'WBTC': 'wrapped-bitcoin',
+  'BTC': 'bitcoin',
+  'tBTC': 'tbtc',
+
+  // Major DeFi tokens
+  'LINK': 'chainlink',
+  'UNI': 'uniswap',
+  'AAVE': 'aave',
+  'CRV': 'curve-dao-token',
+  'CVX': 'convex-finance',
+  'LDO': 'lido-dao',
+  'RPL': 'rocket-pool',
+  'GMX': 'gmx',
+  'ARB': 'arbitrum',
+  'OP': 'optimism',
+  'MATIC': 'matic-network',
+  'SNX': 'havven',
+  'COMP': 'compound-governance-token',
+  'MKR': 'maker',
+  'BAL': 'balancer',
+  'SUSHI': 'sushi',
+  'YFI': 'yearn-finance',
+  'FXS': 'frax-share',
+  'SPELL': 'spell-token',
+  'ALCX': 'alchemix',
+  'PENDLE': 'pendle',
+  'VELO': 'velodrome-finance',
+  'AERO': 'aerodrome-finance',
+  'CAKE': 'pancakeswap-token',
+  'JOE': 'joe',
+  'QUICK': 'quickswap',
+  'RDNT': 'radiant-capital',
+  'STG': 'stargate-finance',
+  'GRAIL': 'camelot-token',
+  'BIFI': 'beefy-finance',
+
+  // Chain native tokens
+  'BNB': 'binancecoin',
+  'AVAX': 'avalanche-2',
+  'FTM': 'fantom',
+  'CELO': 'celo',
+  'GLMR': 'moonbeam',
+  'KAVA': 'kava',
+  'METIS': 'metis-token',
+  'MANTA': 'manta-network',
+  'MODE': 'mode',
+};
+
+// DefiLlama protocol ID mapping (some protocols have different IDs)
+const defiLlamaProtocolIds: Record<string, string> = {
+  'aave-v3': 'aave-v3',
+  'aave-v2': 'aave',
+  'compound-v3': 'compound-v3',
+  'compound-v2': 'compound',
+  'lido': 'lido',
+  'rocket-pool': 'rocket-pool',
+  'curve': 'curve-finance',
+  'convex': 'convex-finance',
+  'uniswap-v3': 'uniswap-v3',
+  'uniswap-v2': 'uniswap',
+  'sushiswap': 'sushi',
+  'balancer-v2': 'balancer-v2',
+  'gmx': 'gmx',
+  'pendle': 'pendle',
+  'yearn': 'yearn-finance',
+  'beefy': 'beefy',
+  'velodrome': 'velodrome',
+  'aerodrome': 'aerodrome',
+  'pancakeswap': 'pancakeswap',
+  'radiant': 'radiant-v2',
+  'morpho': 'morpho',
+  'spark': 'spark',
+  'stargate': 'stargate',
+  'eigenlayer': 'eigenlayer',
+  'ether-fi': 'ether.fi',
+  'renzo': 'renzo',
+};
+
 export const defiLlamaLinks = {
   pool: (poolId: string) => `https://defillama.com/yields/pool/${poolId}`,
-  protocol: (protocol: string) => `https://defillama.com/protocol/${protocol}`,
+  protocol: (protocol: string) => {
+    const id = defiLlamaProtocolIds[protocol] || protocol;
+    return `https://defillama.com/protocol/${id}`;
+  },
   chain: (chain: string) => `https://defillama.com/chain/${chain}`,
+  yields: () => 'https://defillama.com/yields',
 };
 
 export function getProtocolUrl(protocol: string, chain?: string): string {
   const baseUrl = protocolLinks[protocol];
-  if (!baseUrl) return `https://defillama.com/protocol/${protocol}`;
+  if (!baseUrl) return defiLlamaLinks.protocol(protocol);
 
   // Some protocols have chain-specific URLs
   if (chain && baseUrl.includes('app.')) {
@@ -88,8 +210,65 @@ export function getExplorerUrl(chain: string): string {
   return chainExplorers[chain] || `https://defillama.com/chain/${chain}`;
 }
 
+export function getExplorerTokenSearchUrl(chain: string, tokenSymbol: string): string {
+  const explorer = chainExplorers[chain];
+  if (!explorer) return `https://defillama.com/chain/${chain}`;
+
+  // Most explorers support token search
+  // Etherscan-like explorers use /tokens?q=
+  if (explorer.includes('etherscan') || explorer.includes('scan')) {
+    return `${explorer}/tokens?q=${encodeURIComponent(tokenSymbol)}`;
+  }
+
+  // zkSync uses different search
+  if (explorer.includes('zksync')) {
+    return `${explorer}/tokens`;
+  }
+
+  // Fallback to explorer homepage
+  return explorer;
+}
+
 export function getTokenUrl(chain: string, tokenAddress?: string): string {
   const explorer = chainExplorers[chain];
   if (!explorer || !tokenAddress) return '';
   return `${explorer}/token/${tokenAddress}`;
+}
+
+export function getCoinGeckoUrl(tokenSymbol: string): string {
+  // Clean up the symbol - remove wrapping prefixes and get base token
+  const cleanSymbol = tokenSymbol.toUpperCase().trim();
+
+  // Try exact match first
+  if (coinGeckoIds[cleanSymbol]) {
+    return `https://www.coingecko.com/en/coins/${coinGeckoIds[cleanSymbol]}`;
+  }
+
+  // For LP tokens like "WETH-USDC", try the first token
+  if (cleanSymbol.includes('-')) {
+    const firstToken = cleanSymbol.split('-')[0];
+    if (coinGeckoIds[firstToken]) {
+      return `https://www.coingecko.com/en/coins/${coinGeckoIds[firstToken]}`;
+    }
+  }
+
+  // For LP tokens like "WETH/USDC", try the first token
+  if (cleanSymbol.includes('/')) {
+    const firstToken = cleanSymbol.split('/')[0];
+    if (coinGeckoIds[firstToken]) {
+      return `https://www.coingecko.com/en/coins/${coinGeckoIds[firstToken]}`;
+    }
+  }
+
+  // Fallback to search - CoinGecko's search is reliable
+  return `https://www.coingecko.com/en/search?query=${encodeURIComponent(tokenSymbol)}`;
+}
+
+export function getDexScreenerUrl(tokenSymbol: string, chain?: string): string {
+  // DexScreener search works well
+  const cleanSymbol = tokenSymbol.split('-')[0].split('/')[0];
+  if (chain) {
+    return `https://dexscreener.com/${chain.toLowerCase()}?q=${encodeURIComponent(cleanSymbol)}`;
+  }
+  return `https://dexscreener.com/search?q=${encodeURIComponent(cleanSymbol)}`;
 }

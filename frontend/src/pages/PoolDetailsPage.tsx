@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { poolsApi } from '../services/api';
-import { APYChart, StatsCard } from '../components';
-import { getProtocolUrl, getExplorerUrl, defiLlamaLinks } from '../utils/links';
+import { APYChart, StatsCard, ExternalLinkIcon, RefreshIcon } from '../components';
+import { getProtocolUrl, getExplorerTokenSearchUrl, defiLlamaLinks, getCoinGeckoUrl, getDexScreenerUrl } from '../utils/links';
 
 export function PoolDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,7 +14,7 @@ export function PoolDetailsPage() {
   const poolId = id ? decodeURIComponent(id) : '';
 
   // Fetch pool details
-  const { data: pool, isLoading: poolLoading, error: poolError } = useQuery({
+  const { data: pool, isLoading: poolLoading, error: poolError, refetch: refetchPool, isFetching: poolFetching } = useQuery({
     queryKey: ['pool', poolId],
     queryFn: () => poolsApi.get(poolId),
     enabled: !!poolId,
@@ -22,11 +22,20 @@ export function PoolDetailsPage() {
   });
 
   // Fetch pool history
-  const { data: historyData, isLoading: historyLoading } = useQuery({
+  const { data: historyData, isLoading: historyLoading, refetch: refetchHistory, isFetching: historyFetching } = useQuery({
     queryKey: ['pool-history', poolId, historyPeriod],
     queryFn: () => poolsApi.getHistory(poolId, historyPeriod),
     enabled: !!poolId && !!pool,
   });
+
+  // Combined fetching state for sync button
+  const isSyncing = poolFetching || historyFetching;
+
+  // Sync all data
+  const handleSync = () => {
+    refetchPool();
+    refetchHistory();
+  };
 
   const formatNumber = (num: number, decimals = 2) => {
     if (num >= 1e9) return `$${(num / 1e9).toFixed(decimals)}B`;
@@ -95,7 +104,6 @@ export function PoolDetailsPage() {
   }
 
   const protocolUrl = getProtocolUrl(pool.protocol, pool.chain);
-  const explorerUrl = getExplorerUrl(pool.chain);
   const defiLlamaUrl = defiLlamaLinks.protocol(pool.protocol);
 
   return (
@@ -149,7 +157,7 @@ export function PoolDetailsPage() {
               DefiLlama
             </a>
             <a
-              href={explorerUrl}
+              href={getExplorerTokenSearchUrl(pool.chain, pool.underlyingTokens[0] || pool.symbol)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg text-sm transition-colors"
@@ -158,7 +166,7 @@ export function PoolDetailsPage() {
               Explorer
             </a>
             <a
-              href={`https://dexscreener.com/search?q=${pool.underlyingTokens[0] || pool.symbol}`}
+              href={getDexScreenerUrl(pool.underlyingTokens[0] || pool.symbol, pool.chain)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg text-sm transition-colors"
@@ -167,7 +175,7 @@ export function PoolDetailsPage() {
               DexScreener
             </a>
             <a
-              href={`https://www.coingecko.com/en/coins/${pool.underlyingTokens[0]?.toLowerCase() || pool.symbol.toLowerCase()}`}
+              href={getCoinGeckoUrl(pool.underlyingTokens[0] || pool.symbol)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg text-sm transition-colors"
@@ -177,9 +185,20 @@ export function PoolDetailsPage() {
             </a>
           </div>
         </div>
-        <div className={`text-4xl font-bold ${getScoreColor(pool.score)}`}>
-          {pool.score.toFixed(0)}
-          <span className="text-sm font-normal text-gray-400 ml-2">score</span>
+        <div className="flex flex-col items-end gap-3">
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="btn-secondary flex items-center gap-2"
+            title="Refresh pool data"
+          >
+            <RefreshIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync'}
+          </button>
+          <div className={`text-4xl font-bold ${getScoreColor(pool.score)}`}>
+            {pool.score.toFixed(0)}
+            <span className="text-sm font-normal text-gray-400 ml-2">score</span>
+          </div>
         </div>
       </div>
 
@@ -256,7 +275,7 @@ export function PoolDetailsPage() {
                 >
                   <span className="text-white font-medium">{token}</span>
                   <a
-                    href={`https://www.coingecko.com/en/coins/${token.toLowerCase()}`}
+                    href={getCoinGeckoUrl(token)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary-400 hover:text-primary-300 text-sm"
@@ -285,7 +304,7 @@ export function PoolDetailsPage() {
                 >
                   <span className="text-primary-400 font-medium">{token}</span>
                   <a
-                    href={`https://www.coingecko.com/en/coins/${token.toLowerCase()}`}
+                    href={getCoinGeckoUrl(token)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary-400 hover:text-primary-300 text-sm"
@@ -315,7 +334,7 @@ export function PoolDetailsPage() {
             Deposit on {pool.protocol}
           </a>
           <a
-            href={`https://defillama.com/yields?chain=${pool.chain}&token=${pool.symbol}`}
+            href={defiLlamaLinks.yields()}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary inline-flex items-center gap-2"
@@ -323,7 +342,7 @@ export function PoolDetailsPage() {
             Compare on DefiLlama
           </a>
           <a
-            href={`https://dexscreener.com/search?q=${pool.underlyingTokens[0] || pool.symbol}`}
+            href={getDexScreenerUrl(pool.underlyingTokens[0] || pool.symbol, pool.chain)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary inline-flex items-center gap-2"
@@ -331,7 +350,7 @@ export function PoolDetailsPage() {
             View on DexScreener
           </a>
           <a
-            href={`https://www.coingecko.com/en/coins/${pool.underlyingTokens[0]?.toLowerCase() || pool.symbol.toLowerCase()}`}
+            href={getCoinGeckoUrl(pool.underlyingTokens[0] || pool.symbol)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary inline-flex items-center gap-2"
@@ -339,20 +358,12 @@ export function PoolDetailsPage() {
             View on CoinGecko
           </a>
           <a
-            href={explorerUrl}
+            href={getExplorerTokenSearchUrl(pool.chain, pool.underlyingTokens[0] || pool.symbol)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary inline-flex items-center gap-2"
           >
             {pool.chain} Explorer
-          </a>
-          <a
-            href={`https://zapper.xyz/token/${pool.chain.toLowerCase()}/${pool.underlyingTokens[0]?.toLowerCase() || ''}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary inline-flex items-center gap-2"
-          >
-            View on Zapper
           </a>
         </div>
       </div>
@@ -390,13 +401,5 @@ export function PoolDetailsPage() {
         </div>
       </div>
     </div>
-  );
-}
-
-function ExternalLinkIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-    </svg>
   );
 }

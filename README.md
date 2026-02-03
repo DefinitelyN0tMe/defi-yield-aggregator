@@ -22,8 +22,10 @@ A full-stack application for tracking, analyzing, and discovering yield farming 
 - **Modern React Dashboard**: Built with React 18, TypeScript, and Vite
 - **500+ Mock Pools**: Comprehensive mock data across 20 chains and 40+ protocols
 - **Interactive Charts**: APY history charts with Recharts and sparkline trends
-- **External Protocol Links**: Direct deposit links to Aave, Compound, Uniswap, Curve, Lido, and 40+ protocols
+- **External Protocol Links**: Direct deposit links to 40+ protocols with smart token-to-URL mapping
+- **Advanced Search**: Search across ALL pools by symbol, protocol, or chain with debounced input
 - **Advanced Filtering**: Filter by chain, protocol, TVL, APY, stablecoins
+- **Manual Sync**: Instant data refresh button on all pages
 - **Responsive Design**: Mobile-friendly dark theme with Tailwind CSS
 - **Real-time Updates**: WebSocket integration for live pool updates
 
@@ -64,7 +66,7 @@ The application includes:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/defi-yield-aggregator.git
+git clone https://github.com/DefinitelyN0tMe/defi-yield-aggregator.git
 cd defi-yield-aggregator
 ```
 
@@ -192,21 +194,31 @@ The application supports 40+ DeFi protocols including:
 
 ## Supported Chains
 
-20 EVM-compatible chains:
-- Ethereum, Arbitrum, Optimism, Base, Polygon
-- Avalanche, BSC, Fantom, Gnosis, zkSync Era
-- Polygon zkEVM, Linea, Scroll, Mantle, Blast
-- Metis, Celo, Moonbeam, Aurora, Cronos
+20 EVM-compatible chains with dedicated block explorers:
+- **L1**: Ethereum (Etherscan), Avalanche (Snowtrace), BSC (BscScan), Fantom (OKLink)
+- **L2 Optimistic**: Arbitrum (Arbiscan), Optimism (Optimistic Etherscan), Base (BaseScan)
+- **L2 ZK**: zkSync Era, Polygon zkEVM, Linea, Scroll
+- **Alt L1**: Polygon, Gnosis, Celo, Moonbeam, Kava
+- **New Chains**: Mantle, Manta, Blast, Mode, Metis
 
 ## External Links
 
 Every pool and opportunity includes quick access to:
-- **Protocol App**: Direct deposit link to the protocol
-- **DefiLlama**: Compare yields and view analytics
-- **Block Explorer**: View contracts on chain
-- **DexScreener**: Check token trading data
-- **CoinGecko**: Token information and prices
-- **Zapper**: Portfolio tracking
+- **Protocol App**: Direct deposit link to the protocol (Aave, Compound, Uniswap, etc.)
+- **DefiLlama**: Compare yields across all protocols
+- **Block Explorer**: Token search on chain explorers (Etherscan, Arbiscan, etc.)
+- **DexScreener**: Check token trading data and charts
+- **CoinGecko**: Token information, prices, and market data
+
+## Manual Data Refresh
+
+All pages include a **Sync** button for instant data refresh:
+- Dashboard: Refreshes stats, top pools, and opportunities
+- Pools: Refreshes pool list and chain data
+- Opportunities: Refreshes opportunities and trending pools
+- Details pages: Refreshes individual pool/opportunity data
+
+The sync button shows a spinning animation while fetching and is disabled during refresh to prevent double-clicks.
 
 ## Configuration
 

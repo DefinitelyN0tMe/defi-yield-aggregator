@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { poolsApi, chainsApi } from '../services/api';
-import { PoolTable } from '../components';
+import { PoolTable, RefreshIcon } from '../components';
 import type { PoolFilter } from '../types';
 
 export function PoolsPage() {
@@ -15,17 +15,26 @@ export function PoolsPage() {
   });
 
   // Fetch pools
-  const { data: poolsData, isLoading } = useQuery({
+  const { data: poolsData, isLoading, refetch: refetchPools, isFetching: poolsFetching } = useQuery({
     queryKey: ['pools', filter],
     queryFn: () => poolsApi.list(filter),
     placeholderData: keepPreviousData,
   });
 
   // Fetch chains for filter
-  const { data: chainsData } = useQuery({
+  const { data: chainsData, refetch: refetchChains, isFetching: chainsFetching } = useQuery({
     queryKey: ['chains'],
     queryFn: chainsApi.list,
   });
+
+  // Combined fetching state for sync button
+  const isSyncing = poolsFetching || chainsFetching;
+
+  // Sync all data
+  const handleSync = () => {
+    refetchPools();
+    refetchChains();
+  };
 
   const handleFilterChange = (newFilter: PoolFilter) => {
     setFilter({ ...newFilter, offset: 0 });
@@ -49,6 +58,15 @@ export function PoolsPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="btn-secondary flex items-center gap-2"
+            title="Refresh pool data"
+          >
+            <RefreshIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync'}
+          </button>
           {/* Chain filter */}
           <select
             className="select min-w-[150px]"

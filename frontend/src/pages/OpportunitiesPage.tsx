@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { opportunitiesApi } from '../services/api';
-import { OpportunityCard } from '../components';
+import { OpportunityCard, RefreshIcon } from '../components';
 import { useOpportunityAlerts } from '../hooks/useWebSocket';
 import { getProtocolUrl } from '../utils/links';
 import type { OpportunityFilter, OpportunityType, RiskLevel, Opportunity } from '../types';
@@ -18,14 +18,14 @@ export function OpportunitiesPage() {
   });
 
   // Fetch opportunities
-  const { data: oppsData, isLoading, refetch } = useQuery({
+  const { data: oppsData, isLoading, refetch: refetchOpps, isFetching: oppsFetching } = useQuery({
     queryKey: ['opportunities', filter],
     queryFn: () => opportunitiesApi.list(filter),
     placeholderData: keepPreviousData,
   });
 
   // Fetch trending pools
-  const { data: trendingData } = useQuery({
+  const { data: trendingData, refetch: refetchTrending, isFetching: trendingFetching } = useQuery({
     queryKey: ['trending'],
     queryFn: () => opportunitiesApi.getTrending({ limit: 5 }),
   });
@@ -33,8 +33,17 @@ export function OpportunitiesPage() {
   // Subscribe to real-time opportunity alerts
   useOpportunityAlerts(() => {
     // New opportunity received - refresh the list
-    refetch();
+    refetchOpps();
   });
+
+  // Combined fetching state for sync button
+  const isSyncing = oppsFetching || trendingFetching;
+
+  // Sync all data
+  const handleSync = () => {
+    refetchOpps();
+    refetchTrending();
+  };
 
   const handleFilterChange = (newFilter: Partial<OpportunityFilter>) => {
     setFilter((prev) => ({ ...prev, ...newFilter, offset: 0 }));
@@ -69,12 +78,23 @@ export function OpportunitiesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white">Opportunities</h1>
-        <p className="mt-2 text-gray-400">
-          Discover yield farming opportunities based on APY gaps, trending pools, and
-          risk-adjusted scores
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Opportunities</h1>
+          <p className="mt-2 text-gray-400">
+            Discover yield farming opportunities based on APY gaps, trending pools, and
+            risk-adjusted scores
+          </p>
+        </div>
+        <button
+          onClick={handleSync}
+          disabled={isSyncing}
+          className="btn-secondary flex items-center gap-2"
+          title="Refresh opportunities"
+        >
+          <RefreshIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          {isSyncing ? 'Syncing...' : 'Sync'}
+        </button>
       </div>
 
       {/* Trending Pools */}
