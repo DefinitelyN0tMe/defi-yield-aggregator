@@ -37,6 +37,7 @@ export interface PoolFilter {
   chain?: string;
   protocol?: string;
   symbol?: string;
+  search?: string; // Search by symbol, protocol, or chain
   minApy?: number;
   maxApy?: number;
   minTvl?: number;

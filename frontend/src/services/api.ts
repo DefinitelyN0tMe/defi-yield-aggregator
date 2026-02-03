@@ -58,6 +58,17 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 function filterPools(pools: Pool[], filter?: PoolFilter): Pool[] {
   let result = [...pools];
 
+  // Search filter - searches across symbol, protocol, and chain
+  if (filter?.search) {
+    const searchLower = filter.search.toLowerCase();
+    result = result.filter(p =>
+      p.symbol.toLowerCase().includes(searchLower) ||
+      p.protocol.toLowerCase().includes(searchLower) ||
+      p.chain.toLowerCase().includes(searchLower) ||
+      p.poolMeta?.toLowerCase().includes(searchLower)
+    );
+  }
+
   if (filter?.chain) {
     result = result.filter(p => p.chain === filter.chain);
   }

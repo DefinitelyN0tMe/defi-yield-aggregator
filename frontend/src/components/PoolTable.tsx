@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Pool, PoolFilter } from '../types';
 import { getProtocolUrl, getExplorerUrl } from '../utils/links';
 import { formatNumber, getScoreColor, getChangeColor } from '../utils/format';
@@ -26,7 +26,38 @@ export function PoolTable({
   hasMore,
   onLoadMore,
 }: PoolTableProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  // Local search input state with debounce
+  const [searchInput, setSearchInput] = useState(filter.search || '');
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Update local state when filter.search changes externally
+  useEffect(() => {
+    setSearchInput(filter.search || '');
+  }, [filter.search]);
+
+  // Debounced search - waits 300ms after user stops typing
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+
+    // Clear previous timeout
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    // Set new timeout to update filter after 300ms
+    debounceRef.current = setTimeout(() => {
+      onFilterChange?.({ ...filter, search: value || undefined, offset: 0 });
+    }, 300);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   const handleSort = (sortBy: 'apy' | 'tvl' | 'score') => {
     const newOrder =
@@ -43,13 +74,6 @@ export function PoolTable({
     );
   };
 
-  const filteredPools = pools.filter(
-    (pool) =>
-      pool.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pool.protocol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pool.chain.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const handleExternalClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
@@ -62,10 +86,10 @@ export function PoolTable({
           <div className="flex-1 min-w-[200px]">
             <input
               type="text"
-              placeholder="Search by symbol, protocol, or chain..."
+              placeholder="Search all pools by symbol, protocol, or chain..."
               className="input"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -139,7 +163,7 @@ export function PoolTable({
                   </td>
                 </tr>
               ))
-            ) : filteredPools.length === 0 ? (
+            ) : pools.length === 0 ? (
               <tr>
                 <td
                   className="table-cell text-center text-gray-400 py-12"
@@ -155,7 +179,7 @@ export function PoolTable({
                 </td>
               </tr>
             ) : (
-              filteredPools.map((pool) => (
+              pools.map((pool) => (
                 <tr
                   key={pool.id}
                   className="hover:bg-dark-800/50 cursor-pointer transition-colors"
@@ -261,7 +285,7 @@ export function PoolTable({
       {/* Footer */}
       <div className="p-4 border-t border-dark-700 flex items-center justify-between">
         <p className="text-sm text-gray-400">
-          Showing {filteredPools.length} of {total || pools.length} pools
+          Showing {pools.length} of {total || pools.length} pools
         </p>
         <div className="flex items-center gap-3">
           {hasMore && (
