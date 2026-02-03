@@ -1,0 +1,788 @@
+openapi: 3.0.3
+info:
+  title: DeFi Yield Aggregator API
+  description: |
+    A production-ready backend service that tracks, analyzes, and identifies
+    yield farming opportunities across multiple DeFi protocols in real-time.
+
+    ## Features
+    - Real-time data aggregation from 2000+ pools across 20+ chains
+    - Intelligent opportunity detection (yield gaps, trending pools, high-score)
+    - Risk-adjusted scoring algorithm
+    - Historical APY tracking with TimescaleDB
+    - WebSocket support for live updates
+
+    ## Data Sources
+    - **DeFiLlama**: Pool data, APY, TVL (updated every 3 minutes)
+    - **CoinGecko**: Token prices (updated every 10 minutes)
+
+    ## Rate Limits
+    - REST API: 100 requests per minute per IP
+    - WebSocket: Unlimited connections
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: https://api.example.com
+    description: Production server
+
+tags:
+  - name: health
+    description: Service health checks
+  - name: pools
+    description: DeFi yield pool operations
+  - name: opportunities
+    description: Yield opportunity detection
+  - name: stats
+    description: Aggregated statistics
+
+paths:
+  /api/v1/health:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: Returns the health status of the service and its dependencies
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+
+  /api/v1/pools:
+    get:
+      tags:
+        - pools
+      summary: List all pools
+      description: Get a paginated list of DeFi yield pools with optional filtering and sorting
+      operationId: listPools
+      parameters:
+        - name: chain
+          in: query
+          description: Filter by blockchain network
+          schema:
+            type: string
+            example: ethereum
+        - name: protocol
+          in: query
+          description: Filter by protocol name
+          schema:
+            type: string
+            example: aave-v3
+        - name: symbol
+          in: query
+          description: Filter by symbol (partial match)
+          schema:
+            type: string
+            example: USDC
+        - name: minApy
+          in: query
+          description: Minimum APY percentage
+          schema:
+            type: number
+            format: float
+            example: 5.0
+        - name: maxApy
+          in: query
+          description: Maximum APY percentage
+          schema:
+            type: number
+            format: float
+            example: 50.0
+        - name: minTvl
+          in: query
+          description: Minimum TVL in USD
+          schema:
+            type: number
+            format: float
+            example: 1000000
+        - name: maxTvl
+          in: query
+          description: Maximum TVL in USD
+          schema:
+            type: number
+            format: float
+        - name: minScore
+          in: query
+          description: Minimum risk-adjusted score (0-100)
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 100
+        - name: stablecoin
+          in: query
+          description: Filter stablecoin pools only
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [apy, tvl, score]
+            default: tvl
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: limit
+          in: query
+          description: Number of results per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Offset for pagination
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PoolListResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /api/v1/pools/{id}:
+    get:
+      tags:
+        - pools
+      summary: Get pool by ID
+      description: Get detailed information about a specific DeFi yield pool
+      operationId: getPool
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pool ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pool'
+        '404':
+          description: Pool not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/pools/{id}/history:
+    get:
+      tags:
+        - pools
+      summary: Get pool APY history
+      description: Get historical APY and TVL data for charting
+      operationId: getPoolHistory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pool ID
+          schema:
+            type: string
+        - name: period
+          in: query
+          description: Time period
+          schema:
+            type: string
+            enum: [1h, 24h, 7d, 30d]
+            default: 24h
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PoolHistoryResponse'
+        '404':
+          description: Pool not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/opportunities:
+    get:
+      tags:
+        - opportunities
+      summary: List opportunities
+      description: Get a list of detected yield farming opportunities
+      operationId: listOpportunities
+      parameters:
+        - name: type
+          in: query
+          description: Opportunity type
+          schema:
+            type: string
+            enum: [yield-gap, trending, high-score]
+        - name: riskLevel
+          in: query
+          description: Risk level filter
+          schema:
+            type: string
+            enum: [low, medium, high]
+        - name: chain
+          in: query
+          description: Filter by blockchain
+          schema:
+            type: string
+        - name: asset
+          in: query
+          description: Filter by asset symbol
+          schema:
+            type: string
+        - name: minProfit
+          in: query
+          description: Minimum potential profit percentage
+          schema:
+            type: number
+            format: float
+        - name: activeOnly
+          in: query
+          description: Show only active opportunities
+          schema:
+            type: boolean
+            default: true
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [score, profit, apy, detected_at]
+            default: score
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpportunityListResponse'
+
+  /api/v1/opportunities/trending:
+    get:
+      tags:
+        - opportunities
+      summary: Get trending pools
+      description: Get pools with rapidly increasing APY in the last 24 hours
+      operationId: getTrendingPools
+      parameters:
+        - name: chain
+          in: query
+          description: Filter by blockchain
+          schema:
+            type: string
+        - name: minGrowth
+          in: query
+          description: Minimum APY growth percentage
+          schema:
+            type: number
+            format: float
+            default: 10
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendingResponse'
+
+  /api/v1/chains:
+    get:
+      tags:
+        - stats
+      summary: List supported chains
+      description: Get all supported blockchain networks with statistics
+      operationId: listChains
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChainListResponse'
+
+  /api/v1/protocols:
+    get:
+      tags:
+        - stats
+      summary: List protocols
+      description: Get all DeFi protocols with aggregated statistics
+      operationId: listProtocols
+      parameters:
+        - name: chain
+          in: query
+          description: Filter by blockchain
+          schema:
+            type: string
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [tvl, poolCount, apy]
+            default: tvl
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProtocolListResponse'
+
+  /api/v1/stats:
+    get:
+      tags:
+        - stats
+      summary: Get platform statistics
+      description: Get overall platform statistics
+      operationId: getStats
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformStats'
+
+components:
+  schemas:
+    Pool:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique pool identifier
+          example: "aave-v3-ethereum-usdc"
+        chain:
+          type: string
+          description: Blockchain network
+          example: "ethereum"
+        protocol:
+          type: string
+          description: Protocol name
+          example: "aave-v3"
+        symbol:
+          type: string
+          description: Pool symbol
+          example: "USDC"
+        tvl:
+          type: number
+          format: float
+          description: Total Value Locked in USD
+          example: 500000000
+        apy:
+          type: number
+          format: float
+          description: Current APY percentage
+          example: 3.5
+        apyBase:
+          type: number
+          format: float
+          description: Base APY from lending/trading
+          example: 2.5
+        apyReward:
+          type: number
+          format: float
+          description: Reward APY from incentives
+          example: 1.0
+        score:
+          type: number
+          format: float
+          description: Risk-adjusted score (0-100)
+          example: 85.5
+        apyChange24h:
+          type: number
+          format: float
+          description: APY change in last 24 hours
+          example: 0.2
+        stablecoin:
+          type: boolean
+          description: Is stablecoin pool
+          example: true
+        rewardTokens:
+          type: array
+          items:
+            type: string
+          description: Reward token symbols
+        underlyingTokens:
+          type: array
+          items:
+            type: string
+          description: Underlying asset symbols
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PoolListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pool'
+        total:
+          type: integer
+          example: 2500
+        limit:
+          type: integer
+          example: 50
+        offset:
+          type: integer
+          example: 0
+        hasMore:
+          type: boolean
+          example: true
+
+    PoolHistoryResponse:
+      type: object
+      properties:
+        poolId:
+          type: string
+        period:
+          type: string
+        dataPoints:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              apy:
+                type: number
+                format: float
+              tvl:
+                type: number
+                format: float
+
+    Opportunity:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [yield-gap, trending, high-score]
+        title:
+          type: string
+          example: "USDC Yield Gap: 0.70% difference"
+        description:
+          type: string
+        asset:
+          type: string
+          example: "USDC"
+        chain:
+          type: string
+        apyDifference:
+          type: number
+          format: float
+        currentApy:
+          type: number
+          format: float
+        potentialProfit:
+          type: number
+          format: float
+        riskLevel:
+          type: string
+          enum: [low, medium, high]
+        score:
+          type: number
+          format: float
+        isActive:
+          type: boolean
+        detectedAt:
+          type: string
+          format: date-time
+
+    OpportunityListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Opportunity'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    TrendingResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              pool:
+                $ref: '#/components/schemas/Pool'
+              apyGrowth1h:
+                type: number
+                format: float
+              apyGrowth24h:
+                type: number
+                format: float
+              apyGrowth7d:
+                type: number
+                format: float
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    Chain:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "ethereum"
+        displayName:
+          type: string
+          example: "Ethereum"
+        poolCount:
+          type: integer
+          example: 500
+        totalTvl:
+          type: number
+          format: float
+          example: 5000000000
+        averageApy:
+          type: number
+          format: float
+          example: 4.5
+        maxApy:
+          type: number
+          format: float
+          example: 25.0
+
+    ChainListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Chain'
+        total:
+          type: integer
+
+    Protocol:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "aave-v3"
+        displayName:
+          type: string
+          example: "Aave V3"
+        chains:
+          type: array
+          items:
+            type: string
+        poolCount:
+          type: integer
+        totalTvl:
+          type: number
+          format: float
+        averageApy:
+          type: number
+          format: float
+
+    ProtocolListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Protocol'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    PlatformStats:
+      type: object
+      properties:
+        totalPools:
+          type: integer
+          example: 2500
+        totalTvl:
+          type: number
+          format: float
+          example: 50000000000
+        averageApy:
+          type: number
+          format: float
+          example: 5.5
+        medianApy:
+          type: number
+          format: float
+          example: 3.2
+        maxApy:
+          type: number
+          format: float
+          example: 500.0
+        totalChains:
+          type: integer
+          example: 25
+        totalProtocols:
+          type: integer
+          example: 150
+        activeOpportunities:
+          type: integer
+          example: 45
+        lastUpdated:
+          type: string
+          format: date-time
+        tvlByChain:
+          type: object
+          additionalProperties:
+            type: number
+        poolsByChain:
+          type: object
+          additionalProperties:
+            type: integer
+
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+        uptime:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        services:
+          type: object
+          properties:
+            postgresql:
+              $ref: '#/components/schemas/ServiceHealth'
+            redis:
+              $ref: '#/components/schemas/ServiceHealth'
+            elasticsearch:
+              $ref: '#/components/schemas/ServiceHealth'
+
+    ServiceHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [up, down]
+        latency:
+          type: string
+        message:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: string
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "VALIDATION_FAILED"
+            message:
+              type: string
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string

@@ -1,0 +1,91 @@
+# Claude Code working directory
+.claude/
+
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/tmp/
+
+# Build outputs
+/bin/
+/dist/
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+coverage.html
+
+# Go workspace
+go.work
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment files (never commit secrets!)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker volumes (local data)
+docker-data/
+postgres_data/
+redis_data/
+elasticsearch_data/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Air (hot reload)
+tmp/
+build-errors.log
+build-errors-worker.log
+
+# Vendor (optional, depends on preference)
+# vendor/
+
+# Debug files
+debug
+debug.test
+__debug_bin
+
+# Profiling
+*.prof
+*.pprof
+
+# Generated documentation
+docs/swagger.json
+docs/swagger.yaml.bak
+
+# Test databases
+*.db
+*.sqlite
+
+# Secrets
+*.pem
+*.key
+*.crt
+credentials.json
+service-account.json

@@ -1,0 +1,343 @@
+# DeFi Yield Aggregator GraphQL Schema
+
+# Scalar types
+scalar Decimal
+scalar DateTime
+
+# =============================================================================
+# Query Root
+# =============================================================================
+type Query {
+  # Pool queries
+  pool(id: ID!): Pool
+  pools(filter: PoolFilter, pagination: PaginationInput): PoolConnection!
+
+  # Opportunity queries
+  opportunity(id: ID!): Opportunity
+  opportunities(filter: OpportunityFilter, pagination: PaginationInput): OpportunityConnection!
+  trendingPools(chain: String, minGrowth: Float, limit: Int): [TrendingPool!]!
+
+  # Statistics queries
+  chains: [Chain!]!
+  chain(name: String!): Chain
+  protocols(filter: ProtocolFilter, pagination: PaginationInput): ProtocolConnection!
+  protocol(name: String!): Protocol
+  stats: PlatformStats!
+
+  # Health check
+  health: HealthCheck!
+}
+
+# =============================================================================
+# Pool Types
+# =============================================================================
+type Pool {
+  id: ID!
+  chain: String!
+  protocol: String!
+  symbol: String!
+  tvl: Decimal!
+  apy: Decimal!
+  apyBase: Decimal
+  apyReward: Decimal
+  rewardTokens: [String!]
+  underlyingTokens: [String!]
+  poolMeta: String
+  il7d: Decimal
+  apyMean30d: Decimal
+  volumeUsd1d: Decimal
+  volumeUsd7d: Decimal
+  score: Decimal!
+  apyChange1h: Decimal
+  apyChange24h: Decimal
+  apyChange7d: Decimal
+  stablecoin: Boolean!
+  exposure: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Nested queries
+  history(period: HistoryPeriod!): [HistoricalAPY!]!
+  chainInfo: Chain
+  protocolInfo: Protocol
+}
+
+type PoolConnection {
+  edges: [PoolEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PoolEdge {
+  node: Pool!
+  cursor: String!
+}
+
+type HistoricalAPY {
+  timestamp: DateTime!
+  apy: Decimal!
+  tvl: Decimal!
+  apyBase: Decimal
+  apyReward: Decimal
+}
+
+enum HistoryPeriod {
+  HOUR_1
+  HOUR_24
+  DAY_7
+  DAY_30
+}
+
+input PoolFilter {
+  chain: String
+  protocol: String
+  symbol: String
+  minApy: Float
+  maxApy: Float
+  minTvl: Float
+  maxTvl: Float
+  minScore: Float
+  stablecoin: Boolean
+  sortBy: PoolSortField
+  sortOrder: SortOrder
+}
+
+enum PoolSortField {
+  APY
+  TVL
+  SCORE
+  UPDATED_AT
+}
+
+# =============================================================================
+# Opportunity Types
+# =============================================================================
+type Opportunity {
+  id: ID!
+  type: OpportunityType!
+  title: String!
+  description: String
+
+  # For yield-gap opportunities
+  sourcePool: Pool
+  targetPool: Pool
+
+  # For trending/high-score opportunities
+  pool: Pool
+
+  asset: String
+  chain: String
+  apyDifference: Decimal
+  apyGrowth: Decimal
+  currentApy: Decimal
+  potentialProfit: Decimal
+  tvl: Decimal
+  riskLevel: RiskLevel!
+  score: Decimal!
+  isActive: Boolean!
+  detectedAt: DateTime!
+  lastSeenAt: DateTime!
+  expiresAt: DateTime!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type OpportunityConnection {
+  edges: [OpportunityEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type OpportunityEdge {
+  node: Opportunity!
+  cursor: String!
+}
+
+type TrendingPool {
+  pool: Pool!
+  apyGrowth1h: Decimal!
+  apyGrowth24h: Decimal!
+  apyGrowth7d: Decimal!
+  trendScore: Decimal!
+}
+
+enum OpportunityType {
+  YIELD_GAP
+  TRENDING
+  HIGH_SCORE
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+input OpportunityFilter {
+  type: OpportunityType
+  riskLevel: RiskLevel
+  chain: String
+  asset: String
+  minProfit: Float
+  minScore: Float
+  activeOnly: Boolean
+  sortBy: OpportunitySortField
+  sortOrder: SortOrder
+}
+
+enum OpportunitySortField {
+  SCORE
+  PROFIT
+  APY
+  DETECTED_AT
+}
+
+# =============================================================================
+# Statistics Types
+# =============================================================================
+type Chain {
+  name: String!
+  displayName: String!
+  poolCount: Int!
+  totalTvl: Decimal!
+  averageApy: Decimal!
+  maxApy: Decimal!
+  topProtocols: [String!]
+
+  # Nested queries
+  pools(pagination: PaginationInput): PoolConnection!
+}
+
+type Protocol {
+  name: String!
+  displayName: String!
+  category: String
+  chains: [String!]!
+  poolCount: Int!
+  totalTvl: Decimal!
+  averageApy: Decimal!
+  maxApy: Decimal!
+  website: String
+  twitter: String
+  securityScore: Decimal
+
+  # Nested queries
+  pools(pagination: PaginationInput): PoolConnection!
+}
+
+type ProtocolConnection {
+  edges: [ProtocolEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProtocolEdge {
+  node: Protocol!
+  cursor: String!
+}
+
+input ProtocolFilter {
+  chain: String
+  category: String
+  sortBy: ProtocolSortField
+  sortOrder: SortOrder
+}
+
+enum ProtocolSortField {
+  TVL
+  POOL_COUNT
+  APY
+}
+
+type PlatformStats {
+  totalPools: Int!
+  totalTvl: Decimal!
+  averageApy: Decimal!
+  medianApy: Decimal!
+  maxApy: Decimal!
+  totalChains: Int!
+  totalProtocols: Int!
+  activeOpportunities: Int!
+  lastUpdated: DateTime!
+  tvlByChain: [ChainTVL!]!
+  poolsByChain: [ChainPoolCount!]!
+  apyDistribution: APYDistribution!
+}
+
+type ChainTVL {
+  chain: String!
+  tvl: Decimal!
+}
+
+type ChainPoolCount {
+  chain: String!
+  count: Int!
+}
+
+type APYDistribution {
+  range0to1: Int!
+  range1to5: Int!
+  range5to10: Int!
+  range10to25: Int!
+  range25to50: Int!
+  range50to100: Int!
+  range100plus: Int!
+}
+
+# =============================================================================
+# Health Check
+# =============================================================================
+type HealthCheck {
+  status: HealthStatus!
+  version: String!
+  uptime: String!
+  timestamp: DateTime!
+  services: ServiceHealthMap!
+}
+
+type ServiceHealthMap {
+  postgresql: ServiceHealth!
+  redis: ServiceHealth!
+  elasticsearch: ServiceHealth!
+}
+
+type ServiceHealth {
+  status: ServiceStatus!
+  latency: String!
+  message: String
+}
+
+enum HealthStatus {
+  HEALTHY
+  DEGRADED
+  UNHEALTHY
+}
+
+enum ServiceStatus {
+  UP
+  DOWN
+}
+
+# =============================================================================
+# Common Types
+# =============================================================================
+input PaginationInput {
+  first: Int
+  after: String
+  last: Int
+  before: String
+  limit: Int
+  offset: Int
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+enum SortOrder {
+  ASC
+  DESC
+}
