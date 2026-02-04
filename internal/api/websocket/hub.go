@@ -103,16 +103,31 @@ func (h *Hub) Run() {
 
 		case message := <-h.broadcast:
 			h.mu.RLock()
+			// Collect clients with full buffers
+			var deadClients []*Client
 			for client := range h.clients {
 				select {
 				case client.Send <- message:
 				default:
-					// Client buffer full, close connection
-					close(client.Send)
-					delete(h.clients, client)
+					// Client buffer full, mark for removal
+					deadClients = append(deadClients, client)
 				}
 			}
 			h.mu.RUnlock()
+
+			// Remove dead clients with write lock
+			if len(deadClients) > 0 {
+				h.mu.Lock()
+				for _, client := range deadClients {
+					if _, ok := h.clients[client]; ok {
+						delete(h.clients, client)
+						delete(h.poolClients, client)
+						delete(h.opportunityClients, client)
+						close(client.Send)
+					}
+				}
+				h.mu.Unlock()
+			}
 		}
 	}
 }
@@ -138,14 +153,24 @@ func (h *Hub) BroadcastPoolUpdate(pool *models.Pool) {
 	}
 
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-
+	var deadClients []*Client
 	for client := range h.poolClients {
 		select {
 		case client.Send <- msgBytes:
 		default:
-			// Skip if buffer is full
+			// Client buffer full, mark for removal
+			deadClients = append(deadClients, client)
 		}
+	}
+	h.mu.RUnlock()
+
+	// Clean up dead clients
+	if len(deadClients) > 0 {
+		h.mu.Lock()
+		for _, client := range deadClients {
+			delete(h.poolClients, client)
+		}
+		h.mu.Unlock()
 	}
 }
 
@@ -170,14 +195,24 @@ func (h *Hub) BroadcastOpportunityAlert(opp *models.Opportunity) {
 	}
 
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-
+	var deadClients []*Client
 	for client := range h.opportunityClients {
 		select {
 		case client.Send <- msgBytes:
 		default:
-			// Skip if buffer is full
+			// Client buffer full, mark for removal
+			deadClients = append(deadClients, client)
 		}
+	}
+	h.mu.RUnlock()
+
+	// Clean up dead clients
+	if len(deadClients) > 0 {
+		h.mu.Lock()
+		for _, client := range deadClients {
+			delete(h.opportunityClients, client)
+		}
+		h.mu.Unlock()
 	}
 }
 

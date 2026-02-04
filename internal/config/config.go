@@ -223,7 +223,7 @@ func Load() (*Config, error) {
 		WebSocket: WebSocketConfig{
 			PingInterval:   getDuration("WS_PING_INTERVAL", 30*time.Second),
 			PongTimeout:    getDuration("WS_PONG_TIMEOUT", 60*time.Second),
-			MaxMessageSize: int64(getInt("WS_MAX_MESSAGE_SIZE", 512)),
+			MaxMessageSize: int64(getInt("WS_MAX_MESSAGE_SIZE", 65536)), // 64KB for pool updates
 		},
 	}
 

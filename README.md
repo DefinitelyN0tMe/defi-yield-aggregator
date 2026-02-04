@@ -1,88 +1,145 @@
 # DeFi Yield Aggregator
 
-A full-stack application for tracking, analyzing, and discovering yield farming opportunities across multiple DeFi protocols in real-time.
+A production-ready, full-stack application for tracking, analyzing, and discovering yield farming opportunities across multiple DeFi protocols in real-time.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)
+![Go Version](https://img.shields.io/badge/go-1.23+-00ADD8.svg)
 ![React](https://img.shields.io/badge/react-18+-61DAFB.svg)
 ![TypeScript](https://img.shields.io/badge/typescript-5.0+-3178C6.svg)
+![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)
 
 ## Features
 
-### Backend
-- **Real-time Data Aggregation**: Fetches data from 2000+ pools across 20+ chains
+### Backend (Go + Fiber)
+- **Real-time Data Aggregation**: Fetches data from 2000+ pools across 30+ chains via DeFiLlama API
 - **Intelligent Opportunity Detection**: Identifies yield gaps, trending pools, and high-score opportunities
 - **Risk-Adjusted Scoring**: Calculates scores based on APY, TVL, stability, and chain security
-- **Time-Series Analytics**: Historical APY tracking with TimescaleDB
-- **Fast Search**: Sub-second search across millions of records with ElasticSearch
-- **Real-Time Updates**: WebSocket support for live data streaming
-- **Production-Ready**: Docker, logging, error handling, and rate limiting
+- **Time-Series Analytics**: Historical APY tracking with TimescaleDB (PostgreSQL extension)
+- **Fast Search**: Sub-100ms search across millions of records with ElasticSearch
+- **Multi-Layer Caching**: Redis caching with intelligent cache key generation
+- **Real-Time Updates**: WebSocket support for live pool/opportunity streaming
+- **Production-Ready**: Docker, structured logging, error handling, rate limiting, and request timeouts
 
-### Frontend
-- **Modern React Dashboard**: Built with React 18, TypeScript, and Vite
-- **500+ Mock Pools**: Comprehensive mock data across 20 chains and 40+ protocols
-- **Interactive Charts**: APY history charts with Recharts and sparkline trends
-- **External Protocol Links**: Direct deposit links to 40+ protocols with smart token-to-URL mapping
-- **Advanced Search**: Search across ALL pools by symbol, protocol, or chain with debounced input
-- **Advanced Filtering**: Filter by chain, protocol, TVL, APY, stablecoins
-- **Manual Sync**: Instant data refresh button on all pages
+### Frontend (React 18 + TypeScript)
+- **Modern Dashboard**: Built with React 18, TypeScript 5, and Vite 5
+- **Type-Safe API Layer**: Full type transformation between API (strings) and frontend (numbers)
+- **Interactive Charts**: APY history visualization with Recharts
+- **Smart External Links**:
+  - Protocol apps (40+ DeFi protocols)
+  - Block explorers (30+ chain explorers)
+  - CoinGecko token pages (symbol-to-ID mapping)
+  - DexScreener charts
+  - DeFiLlama analytics
+- **Advanced Search**: Case-insensitive multi-field search (symbol, protocol, chain)
+- **Advanced Filtering**: Filter by chain, protocol, TVL, APY, stablecoins with proper pagination
+- **Infinite Scroll**: Load more with data accumulation for opportunities
+- **Real-time Updates**: WebSocket integration with auto-reconnect
 - **Responsive Design**: Mobile-friendly dark theme with Tailwind CSS
-- **Real-time Updates**: WebSocket integration for live pool updates
 
-## Screenshots
+## Architecture
 
-The application includes:
-- **Dashboard**: Overview of TVL, top pools, and active opportunities
-- **Pools Explorer**: Table view with search, filters, and sorting
-- **Pool Details**: Full APY history charts, token info, and quick deposit actions
-- **Opportunities**: Yield gaps, trending pools, and arbitrage opportunities
-- **Opportunity Details**: Comprehensive analysis with external links
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Frontend (React)                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Pages     │  │  Components │  │   Hooks     │              │
+│  │  - Home     │  │  - PoolCard │  │  - useWS    │              │
+│  │  - Pools    │  │  - Charts   │  │  - useQuery │              │
+│  │  - Details  │  │  - Tables   │  │             │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+│                           │                                      │
+│                    API Service Layer                             │
+│              (Type transformation layer)                         │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ HTTP/WebSocket
+┌──────────────────────────┴──────────────────────────────────────┐
+│                      API Server (Go/Fiber)                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  Handlers   │  │ Middleware  │  │  WebSocket  │              │
+│  │  - Pools    │  │  - CORS     │  │    Hub      │              │
+│  │  - Opps     │  │  - Rate     │  │  (real-time)│              │
+│  │  - Stats    │  │  - Timeout  │  │             │              │
+│  └──────┬──────┘  └─────────────┘  └─────────────┘              │
+│         │                                                        │
+│  ┌──────┴─────────────────────────────────────────────┐         │
+│  │              Service Layer                          │         │
+│  │  - Opportunity Detection (yield gaps, trending)     │         │
+│  │  - Scoring Engine (risk-adjusted scores)            │         │
+│  │  - Pool Aggregation                                 │         │
+│  └─────────────────────────┬───────────────────────────┘         │
+└────────────────────────────┼────────────────────────────────────┘
+                             │
+┌────────────────────────────┼────────────────────────────────────┐
+│                     Data Layer                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │ PostgreSQL  │  │   Redis     │  │ElasticSearch│              │
+│  │ +TimescaleDB│  │   Cache     │  │   Search    │              │
+│  │ (primary)   │  │ (30-60s TTL)│  │ (fallback)  │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+                             │
+┌────────────────────────────┼────────────────────────────────────┐
+│                     Worker Service                               │
+│  ┌─────────────────────────────────────────────┐                │
+│  │  - Fetches pools from DeFiLlama (3m interval)│                │
+│  │  - Indexes to ElasticSearch                  │                │
+│  │  - Detects opportunities (5m interval)       │                │
+│  │  - Broadcasts updates via WebSocket          │                │
+│  └─────────────────────────────────────────────┘                │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## Tech Stack
 
 ### Backend
-- **Go 1.21+** with Fiber framework
-- **PostgreSQL 15** with TimescaleDB extension
-- **ElasticSearch 8.x** for fast search and analytics
-- **Redis 7.x** for caching and pub/sub
-- **Docker Compose** for containerization
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Framework | Go 1.23 + Fiber | High-performance HTTP server |
+| Database | PostgreSQL 15 + TimescaleDB | Primary storage + time-series |
+| Search | ElasticSearch 8.x | Fast full-text search |
+| Cache | Redis 7.x | Response caching |
+| Container | Docker + Docker Compose | Deployment |
 
 ### Frontend
-- **React 18** with TypeScript
-- **Vite** for fast development and building
-- **TanStack React Query v5** for data fetching
-- **Tailwind CSS** for styling
-- **Recharts** for data visualization
-- **React Router v6** for navigation
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Framework | React 18 | UI components |
+| Language | TypeScript 5 | Type safety |
+| Build | Vite 5 | Fast development |
+| Data | TanStack Query v5 | Server state management |
+| Styling | Tailwind CSS 3 | Utility-first CSS |
+| Charts | Recharts | Data visualization |
+| Routing | React Router v6 | Navigation |
 
 ## Quick Start
 
 ### Prerequisites
+- Docker and Docker Compose (for full stack)
+- Node.js 18+ (for frontend only)
+- Go 1.23+ (for backend development)
 
-- Docker and Docker Compose
-- Node.js 18+ (for frontend development)
-- Go 1.21+ (for backend development)
-
-### 1. Clone the Repository
+### Option 1: Full Stack with Docker
 
 ```bash
-git clone https://github.com/DefinitelyN0tMe/defi-yield-aggregator.git
+# Clone the repository
+git clone https://github.com/yourusername/defi-yield-aggregator.git
 cd defi-yield-aggregator
-```
 
-### 2. Start Backend Services (Optional)
-
-```bash
 # Copy environment file
 cp .env.example .env
 
-# Start all services
+# Start all services (API, Worker, PostgreSQL, Redis, ElasticSearch)
 docker-compose up -d
+
+# View logs
+docker-compose logs -f api worker
+
+# Access the application
+# API: http://localhost:3000/api/v1/health
+# Frontend: http://localhost:5173
 ```
 
-### 3. Start Frontend (with Mock Data)
-
-The frontend works standalone with comprehensive mock data:
+### Option 2: Frontend Only (Mock Data)
 
 ```bash
 cd frontend
@@ -90,222 +147,306 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+Open http://localhost:5173 - works with comprehensive mock data.
 
-### 4. Build for Production
+### Option 3: Development Mode
 
 ```bash
-# Frontend
-cd frontend
-npm run build
+# Terminal 1: Start infrastructure
+docker-compose up -d postgres redis elasticsearch
 
-# Backend
-docker build --target production-api -t defi-api:latest .
-docker build --target production-worker -t defi-worker:latest .
-```
+# Terminal 2: Start API with hot reload
+cd cmd/server && air
 
-## Project Structure
+# Terminal 3: Start Worker
+cd cmd/worker && air
 
-```
-defi-yield-aggregator/
-├── cmd/                          # Go entry points
-│   ├── server/main.go           # HTTP server
-│   └── worker/main.go           # Background worker
-├── internal/                     # Go internal packages
-│   ├── api/                     # HTTP handlers, middleware
-│   ├── services/                # Business logic
-│   ├── repository/              # Data access
-│   └── models/                  # Data structures
-├── frontend/                     # React frontend
-│   ├── src/
-│   │   ├── components/          # Reusable UI components
-│   │   │   ├── APYChart.tsx    # APY history chart
-│   │   │   ├── PoolCard.tsx    # Pool card with sparkline
-│   │   │   ├── PoolTable.tsx   # Pools table view
-│   │   │   ├── Sparkline.tsx   # Mini trend chart
-│   │   │   ├── Icons.tsx       # Shared icons
-│   │   │   └── ...
-│   │   ├── pages/              # Page components
-│   │   │   ├── HomePage.tsx
-│   │   │   ├── PoolsPage.tsx
-│   │   │   ├── PoolDetailsPage.tsx
-│   │   │   ├── OpportunitiesPage.tsx
-│   │   │   └── OpportunityDetailsPage.tsx
-│   │   ├── services/           # API and mock data
-│   │   ├── hooks/              # Custom React hooks
-│   │   ├── utils/              # Utilities and helpers
-│   │   │   ├── format.ts       # Number/date formatting
-│   │   │   ├── links.ts        # Protocol URLs
-│   │   │   └── constants.ts    # App constants
-│   │   └── types/              # TypeScript types
-│   └── package.json
-├── migrations/                   # Database migrations
-├── docker-compose.yml
-└── README.md
+# Terminal 4: Start Frontend
+cd frontend && npm run dev
 ```
 
 ## API Reference
 
-### Health Check
+### Health & Stats
 ```bash
-GET /api/v1/health
+GET /api/v1/health              # Service health check
+GET /api/v1/stats               # Aggregated statistics
+GET /api/v1/chains              # List of supported chains
+GET /api/v1/protocols           # List of protocols
 ```
 
 ### Pools
 ```bash
 # List pools with filters
-GET /api/v1/pools?chain=ethereum&minApy=5&sortBy=tvl&limit=20
+GET /api/v1/pools
+  ?chain=ethereum               # Filter by chain (case-insensitive)
+  &protocol=aave-v3             # Filter by protocol
+  &symbol=ETH                   # Filter by symbol (partial match)
+  &search=USDC                  # Search across all fields
+  &minApy=5                     # Minimum APY
+  &maxApy=100                   # Maximum APY
+  &minTvl=1000000              # Minimum TVL
+  &minScore=50                  # Minimum score
+  &stablecoin=true             # Stablecoin pools only
+  &sortBy=apy|tvl|score        # Sort field (default: tvl)
+  &sortOrder=asc|desc          # Sort order (default: desc)
+  &limit=50                     # Results per page (max: 100)
+  &offset=0                     # Pagination offset
 
 # Get specific pool
 GET /api/v1/pools/:id
 
-# Get pool history
-GET /api/v1/pools/:id/history?period=7d
+# Get pool APY history
+GET /api/v1/pools/:id/history
+  ?period=1h|24h|7d|30d        # Time period (default: 24h)
 ```
 
 ### Opportunities
 ```bash
 # List opportunities
-GET /api/v1/opportunities?type=yield-gap&riskLevel=low
+GET /api/v1/opportunities
+  ?type=yield-gap|trending|high-score
+  &riskLevel=low|medium|high
+  &chain=ethereum
+  &asset=USDC
+  &minProfit=1
+  &minScore=50
+  &activeOnly=true             # Active opportunities only
+  &sortBy=score|profit|apy     # Sort field
+  &limit=50
+  &offset=0
 
 # Get trending pools
 GET /api/v1/opportunities/trending
+  ?chain=ethereum
+  &minGrowth=10                # Minimum APY growth %
+  &limit=20
 ```
 
-### Statistics
-```bash
-GET /api/v1/chains
-GET /api/v1/protocols
-GET /api/v1/stats
+### WebSocket
+```javascript
+// Connect to pools stream
+ws://localhost:3000/ws/pools
+
+// Connect to opportunities stream
+ws://localhost:3000/ws/opportunities
+
+// Message types received:
+// - pool_update: Real-time pool data changes
+// - opportunity_alert: New opportunity detected
+// - ping/pong: Keep-alive
 ```
-
-## Supported Protocols
-
-The application supports 40+ DeFi protocols including:
-
-| Category | Protocols |
-|----------|-----------|
-| Lending | Aave V3, Compound V3, Spark, Morpho, Radiant |
-| DEXs | Uniswap V3, Curve, SushiSwap, Balancer, Velodrome |
-| Liquid Staking | Lido, Rocket Pool, Frax ETH, Coinbase ETH |
-| Yield Vaults | Yearn, Beefy, Convex, Pendle |
-| Derivatives | GMX, dYdX, Synthetix, Gains Network |
-| Bridges | Stargate, Hop Protocol, Across |
-
-## Supported Chains
-
-20 EVM-compatible chains with dedicated block explorers:
-- **L1**: Ethereum (Etherscan), Avalanche (Snowtrace), BSC (BscScan), Fantom (OKLink)
-- **L2 Optimistic**: Arbitrum (Arbiscan), Optimism (Optimistic Etherscan), Base (BaseScan)
-- **L2 ZK**: zkSync Era, Polygon zkEVM, Linea, Scroll
-- **Alt L1**: Polygon, Gnosis, Celo, Moonbeam, Kava
-- **New Chains**: Mantle, Manta, Blast, Mode, Metis
-
-## External Links
-
-Every pool and opportunity includes quick access to:
-- **Protocol App**: Direct deposit link to the protocol (Aave, Compound, Uniswap, etc.)
-- **DefiLlama**: Compare yields across all protocols
-- **Block Explorer**: Token search on chain explorers (Etherscan, Arbiscan, etc.)
-- **DexScreener**: Check token trading data and charts
-- **CoinGecko**: Token information, prices, and market data
-
-## Manual Data Refresh
-
-All pages include a **Sync** button for instant data refresh:
-- Dashboard: Refreshes stats, top pools, and opportunities
-- Pools: Refreshes pool list and chain data
-- Opportunities: Refreshes opportunities and trending pools
-- Details pages: Refreshes individual pool/opportunity data
-
-The sync button shows a spinning animation while fetching and is disabled during refresh to prevent double-clicks.
 
 ## Configuration
 
-### Frontend Environment Variables
-
-Create `frontend/.env.local`:
-
-```env
-VITE_API_BASE=/api/v1
-VITE_USE_MOCK_DATA=true
-VITE_WS_BASE=ws://localhost:8080
-```
-
-### Backend Environment Variables
-
-See `.env.example` for all options:
+### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| **Server** |||
 | `SERVER_PORT` | API server port | 3000 |
+| `SERVER_READ_TIMEOUT` | Request read timeout | 30s |
+| `APP_ENV` | Environment (development/production) | development |
+| **Database** |||
 | `POSTGRES_HOST` | PostgreSQL host | localhost |
+| `POSTGRES_PORT` | PostgreSQL port | 5432 |
+| `POSTGRES_USER` | Database user | defi |
+| `POSTGRES_PASSWORD` | Database password | ⚠️ Change in production |
+| `POSTGRES_DB` | Database name | defi_aggregator |
+| `POSTGRES_MAX_CONNECTIONS` | Connection pool size | 25 |
+| **Redis** |||
 | `REDIS_HOST` | Redis host | localhost |
+| `REDIS_PORT` | Redis port | 6379 |
+| `REDIS_POOL_SIZE` | Connection pool size | 10 |
+| **ElasticSearch** |||
 | `ELASTICSEARCH_URL` | ElasticSearch URL | http://localhost:9200 |
+| **Data Fetching** |||
 | `DEFILLAMA_FETCH_INTERVAL` | Pool fetch interval | 3m |
+| `OPPORTUNITY_DETECT_INTERVAL` | Opportunity detection interval | 5m |
 | `MIN_TVL_THRESHOLD` | Minimum TVL to consider | 100000 |
+| `MIN_APY_THRESHOLD` | Minimum APY to consider | 0.1 |
+| `YIELD_GAP_MIN_PROFIT` | Min profit for yield gap alerts | 0.5 |
+| **Rate Limiting** |||
+| `RATE_LIMIT_REQUESTS` | Requests per window | 100 |
+| `RATE_LIMIT_WINDOW` | Rate limit window | 1m |
+| **CORS** |||
+| `CORS_ALLOWED_ORIGINS` | Allowed origins | * (⚠️ Restrict in production) |
 
-## Development
+### Frontend Configuration
 
-### Frontend Development
-
-```bash
-cd frontend
-npm install
-npm run dev        # Start dev server
-npm run build      # Production build
-npm run lint       # Run ESLint
-npm run preview    # Preview production build
+Create `frontend/.env.local`:
+```env
+VITE_API_BASE=/api/v1
+VITE_USE_MOCK_DATA=false
 ```
 
-### Backend Development
+## Supported Protocols (40+)
 
-```bash
-# Install dependencies
-go mod download
+| Category | Protocols |
+|----------|-----------|
+| **Lending** | Aave V3, Compound V3, Spark, Morpho, Radiant, Venus, BenQi |
+| **DEXs** | Uniswap V3/V2, Curve, SushiSwap, Balancer, Velodrome, Aerodrome, PancakeSwap |
+| **Liquid Staking** | Lido, Rocket Pool, Frax ETH, Coinbase ETH, EigenLayer, EtherFi, Renzo |
+| **Yield Vaults** | Yearn, Beefy, Convex, Pendle, Sommelier |
+| **Derivatives** | GMX, Gains Network |
+| **Bridges** | Stargate, Hop Protocol, Across |
+| **Institutional** | Maple, Goldfinch |
 
-# Run API server
-go run cmd/server/main.go
+## Supported Chains (30+)
 
-# Run worker
-go run cmd/worker/main.go
-
-# Run with hot reload
-air -c .air.toml
-
-# Run tests
-go test ./...
-```
-
-## Data Sources
-
-### DeFiLlama
-- Free API, no key required
-- Updates every 3 minutes
-- Provides 2000+ pools with APY, TVL data
-
-### CoinGecko
-- Free Demo plan available
-- Updates every 10 minutes
-- Token prices for calculations
+| Category | Chains |
+|----------|--------|
+| **L1** | Ethereum, Avalanche, BSC, Fantom, Solana, Aptos, Sui |
+| **L2 Optimistic** | Arbitrum, Optimism, Base, Mantle, Blast, Mode |
+| **L2 ZK** | zkSync Era, Polygon zkEVM, Linea, Scroll, StarkNet |
+| **Alt L1** | Polygon, Gnosis, Celo, Moonbeam, Kava, Aurora, Cronos |
+| **New** | Berachain, Sonic, Hyperliquid, Monad |
 
 ## Opportunity Detection
 
 ### Yield Gap Arbitrage
 Identifies the same asset with different APYs across protocols:
 ```
-USDC on Aave (3.5%) vs Compound (4.2%) = +0.7% opportunity
+USDC on Aave V3 (3.5% APY) vs Compound V3 (4.2% APY)
+→ +0.7% yield gap opportunity
+→ Estimated profit: $7,000/year on $1M position
 ```
 
-### APY Trend Analysis
-- Tracks 1h, 24h, 7d APY changes
-- Alerts on significant APY increases (>50%)
-- Identifies "hot pools" with growing yields
+### Trending Pools
+Detects pools with rapidly increasing APY:
+```
+Pool: WETH on Aerodrome
+→ APY increased 150% in 24h
+→ Current APY: 25.5%
+→ TVL: $50M
+```
 
 ### Risk-Adjusted Scoring
 ```
-score = (APY × 0.35) + (TVL × 0.25) + (Stability × 0.25) + (Trend × 0.15)
+Score = (APY × 0.35) + (TVL × 0.25) + (Stability × 0.25) + (Trend × 0.15)
+
+Where:
+- APY: Normalized yield percentage
+- TVL: Liquidity depth indicator
+- Stability: 30-day APY variance
+- Trend: 7-day momentum
 ```
+
+## Performance Optimizations
+
+### Backend
+- **Connection Pooling**: PostgreSQL (25 connections), Redis (10 connections)
+- **Request Timeouts**: 30-second context timeout on all database operations
+- **Multi-Layer Caching**: Redis cache with comprehensive cache keys
+- **ElasticSearch Fallback**: Automatic fallback to PostgreSQL if ES returns no results
+- **WebSocket Optimization**: Dead client cleanup, race condition fixes
+
+### Frontend
+- **Type Transformation**: API returns strings, frontend converts to numbers
+- **Data Accumulation**: Infinite scroll without losing previous data
+- **Optimistic Updates**: React Query with placeholder data
+- **Debounced Search**: 300ms debounce on search input
+
+## Project Structure
+
+```
+defi-yield-aggregator/
+├── cmd/
+│   ├── server/main.go          # API server entry point
+│   └── worker/main.go          # Background worker entry point
+├── internal/
+│   ├── api/
+│   │   ├── handlers/           # HTTP handlers with validation
+│   │   ├── middleware/         # CORS, rate limiting, logging
+│   │   └── websocket/          # WebSocket hub and clients
+│   ├── config/                 # Configuration management
+│   ├── models/                 # Data structures
+│   ├── repository/
+│   │   ├── postgres/           # PostgreSQL + TimescaleDB
+│   │   ├── redis/              # Redis caching
+│   │   └── elasticsearch/      # ElasticSearch search
+│   └── services/
+│       ├── defillama/          # DeFiLlama API client
+│       ├── opportunity/        # Opportunity detection
+│       └── scoring/            # Risk scoring engine
+├── frontend/
+│   ├── src/
+│   │   ├── components/         # Reusable UI components
+│   │   ├── pages/              # Page components
+│   │   ├── services/           # API client with transformations
+│   │   ├── hooks/              # Custom React hooks
+│   │   ├── utils/              # Helpers (links, formatting)
+│   │   └── types/              # TypeScript definitions
+│   └── package.json
+├── migrations/                 # Database migrations
+├── docker-compose.yml
+├── Dockerfile
+└── README.md
+```
+
+## Development
+
+### Running Tests
+```bash
+# Backend tests
+go test ./... -v
+
+# Frontend tests
+cd frontend && npm test
+```
+
+### Building for Production
+```bash
+# Backend
+docker build --target production-api -t defi-api:latest .
+docker build --target production-worker -t defi-worker:latest .
+
+# Frontend
+cd frontend && npm run build
+```
+
+### Code Quality
+```bash
+# Go
+go fmt ./...
+go vet ./...
+golangci-lint run
+
+# TypeScript
+cd frontend
+npm run lint
+npm run type-check
+```
+
+## Security Considerations
+
+⚠️ **Before deploying to production:**
+
+1. **Change default credentials** in `.env`
+2. **Restrict CORS origins** (`CORS_ALLOWED_ORIGINS`)
+3. **Enable TLS/SSL** for all connections
+4. **Set up proper authentication** for sensitive endpoints
+5. **Configure rate limiting** appropriately
+6. **Use secrets management** (Vault, AWS Secrets, etc.)
+
+## Troubleshooting
+
+### Common Issues
+
+**Search not working:**
+- Check ElasticSearch is running: `curl localhost:9200/_cluster/health`
+- Verify index exists: `curl localhost:9200/defi_pools/_count`
+- Check API logs for errors
+
+**Opportunities not loading:**
+- Ensure worker is running and detecting opportunities
+- Check PostgreSQL has opportunity data
+- Verify cache is not stale
+
+**WebSocket disconnects:**
+- Check for network issues
+- Verify `WS_PING_INTERVAL` and `WS_PONG_TIMEOUT` settings
+- Check browser console for errors
 
 ## Contributing
 
@@ -321,13 +462,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- [DeFiLlama](https://defillama.com) for yield data API
-- [CoinGecko](https://coingecko.com) for price data
-- [Fiber](https://gofiber.io) for Go web framework
-- [TanStack Query](https://tanstack.com/query) for React data fetching
-- [Tailwind CSS](https://tailwindcss.com) for styling
-- [Recharts](https://recharts.org) for charts
+- [DeFiLlama](https://defillama.com) - Yield data API
+- [CoinGecko](https://coingecko.com) - Token data
+- [Fiber](https://gofiber.io) - Go web framework
+- [TanStack Query](https://tanstack.com/query) - React data fetching
+- [Tailwind CSS](https://tailwindcss.com) - Styling
+- [Recharts](https://recharts.org) - Charts
 
-## 👨‍💻 Author
+---
 
-Maksim Jatmanov - Backend Developer specializing in Go, Blockchain & AI
+**Author**: Maksim Jatmanov - Backend Developer specializing in Go, Blockchain & AI

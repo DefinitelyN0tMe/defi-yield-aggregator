@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { opportunitiesApi } from '../services/api';
@@ -17,12 +17,32 @@ export function OpportunitiesPage() {
     offset: 0,
   });
 
+  // Accumulated opportunities for infinite scroll
+  const [accumulatedOpps, setAccumulatedOpps] = useState<Opportunity[]>([]);
+
   // Fetch opportunities
   const { data: oppsData, isLoading, refetch: refetchOpps, isFetching: oppsFetching } = useQuery({
     queryKey: ['opportunities', filter],
     queryFn: () => opportunitiesApi.list(filter),
     placeholderData: keepPreviousData,
   });
+
+  // Accumulate opportunities when data changes
+  useEffect(() => {
+    if (oppsData?.data) {
+      if (filter.offset === 0) {
+        // Reset when filters change (offset resets to 0)
+        setAccumulatedOpps(oppsData.data);
+      } else {
+        // Append new data for "Load More"
+        setAccumulatedOpps((prev) => {
+          const existingIds = new Set(prev.map((o) => o.id));
+          const newOpps = oppsData.data.filter((o) => !existingIds.has(o.id));
+          return [...prev, ...newOpps];
+        });
+      }
+    }
+  }, [oppsData?.data, filter.offset]);
 
   // Fetch trending pools
   const { data: trendingData, refetch: refetchTrending, isFetching: trendingFetching } = useQuery({
@@ -213,13 +233,13 @@ export function OpportunitiesPage() {
       </div>
 
       {/* Opportunities Grid */}
-      {isLoading ? (
+      {isLoading && accumulatedOpps.length === 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="card h-48 animate-pulse bg-dark-800" />
           ))}
         </div>
-      ) : oppsData?.data.length === 0 ? (
+      ) : accumulatedOpps.length === 0 ? (
         <div className="card text-center py-12">
           <NoDataIcon className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-white">
@@ -246,7 +266,7 @@ export function OpportunitiesPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {oppsData?.data.map((opportunity) => (
+            {accumulatedOpps.map((opportunity) => (
               <OpportunityCard
                 key={opportunity.id}
                 opportunity={opportunity}
@@ -258,8 +278,12 @@ export function OpportunitiesPage() {
           {/* Load More */}
           {oppsData?.hasMore && (
             <div className="text-center">
-              <button className="btn-secondary" onClick={handleLoadMore}>
-                Load More
+              <button
+                className="btn-secondary"
+                onClick={handleLoadMore}
+                disabled={oppsFetching}
+              >
+                {oppsFetching ? 'Loading...' : 'Load More'}
               </button>
             </div>
           )}

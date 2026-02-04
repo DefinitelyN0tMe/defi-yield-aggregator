@@ -109,7 +109,7 @@ func main() {
 
 	// Schedule opportunity detection job (every 5 minutes)
 	_, err = scheduler.AddFunc("0 */5 * * * *", func() {
-		runOpportunityDetectionJob(ctx, opportunityService, redisRepo)
+		runOpportunityDetectionJob(ctx, opportunityService, pgRepo, redisRepo)
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to schedule opportunity detection job")
@@ -125,7 +125,7 @@ func main() {
 		log.Info().Msg("Running initial data fetch...")
 		runDeFiLlamaJob(ctx, cfg, defiLlamaClient, pgRepo, redisRepo, esRepo, analyticsService)
 		runCoinGeckoJob(ctx, coinGeckoClient, redisRepo)
-		runOpportunityDetectionJob(ctx, opportunityService, redisRepo)
+		runOpportunityDetectionJob(ctx, opportunityService, pgRepo, redisRepo)
 	}()
 
 	// Wait for shutdown signal
@@ -296,10 +296,16 @@ func runCoinGeckoJob(
 func runOpportunityDetectionJob(
 	ctx context.Context,
 	service *opportunity.Service,
+	pgRepo *postgres.Repository,
 	redisRepo *redis.Repository,
 ) {
 	startTime := time.Now()
 	log.Info().Msg("Starting opportunity detection job")
+
+	// Deactivate expired opportunities first
+	if err := pgRepo.DeactivateExpiredOpportunities(ctx); err != nil {
+		log.Warn().Err(err).Msg("Failed to deactivate expired opportunities")
+	}
 
 	// Detect yield gap opportunities
 	yieldGaps, err := service.DetectYieldGaps(ctx)
@@ -308,8 +314,11 @@ func runOpportunityDetectionJob(
 	} else {
 		log.Info().Int("count", len(yieldGaps)).Msg("Detected yield gap opportunities")
 
-		// Publish alerts for new opportunities
+		// Save and publish alerts for new opportunities
 		for _, opp := range yieldGaps {
+			if err := pgRepo.UpsertOpportunity(ctx, &opp); err != nil {
+				log.Warn().Err(err).Str("id", opp.ID).Msg("Failed to save opportunity")
+			}
 			if err := redisRepo.PublishOpportunityAlert(ctx, &opp); err != nil {
 				log.Debug().Err(err).Msg("Failed to publish opportunity alert")
 			}
@@ -322,6 +331,13 @@ func runOpportunityDetectionJob(
 		log.Error().Err(err).Msg("Failed to detect trending pools")
 	} else {
 		log.Info().Int("count", len(trending)).Msg("Detected trending pools")
+
+		// Save trending opportunities
+		for _, opp := range trending {
+			if err := pgRepo.UpsertOpportunity(ctx, &opp); err != nil {
+				log.Warn().Err(err).Str("id", opp.ID).Msg("Failed to save trending opportunity")
+			}
+		}
 	}
 
 	// Detect high-score opportunities
@@ -330,6 +346,13 @@ func runOpportunityDetectionJob(
 		log.Error().Err(err).Msg("Failed to detect high-score pools")
 	} else {
 		log.Info().Int("count", len(highScore)).Msg("Detected high-score opportunities")
+
+		// Save high-score opportunities
+		for _, opp := range highScore {
+			if err := pgRepo.UpsertOpportunity(ctx, &opp); err != nil {
+				log.Warn().Err(err).Str("id", opp.ID).Msg("Failed to save high-score opportunity")
+			}
+		}
 	}
 
 	duration := time.Since(startTime)

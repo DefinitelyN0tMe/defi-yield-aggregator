@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Base - Common Go setup
 # -----------------------------------------------------------------------------
-FROM golang:1.21-alpine AS base
+FROM golang:1.23-alpine AS base
 
 # Install essential packages
 RUN apk add --no-cache git ca-certificates tzdata
@@ -27,7 +27,8 @@ RUN go mod download
 FROM base AS development
 
 # Install Air for hot reload (https://github.com/cosmtrek/air)
-RUN go install github.com/cosmtrek/air@latest
+# Pin to v1.52.3 which is compatible with Go 1.23
+RUN go install github.com/air-verse/air@v1.52.3
 
 # Install additional development tools
 RUN apk add --no-cache curl

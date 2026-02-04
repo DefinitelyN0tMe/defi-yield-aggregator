@@ -53,7 +53,7 @@ export const chainExplorers: Record<string, string> = {
   'avalanche': 'https://snowtrace.io',
   'fantom': 'https://www.oklink.com/fantom',
   'gnosis': 'https://gnosisscan.io',
-  'zkSync': 'https://explorer.zksync.io',
+  'zksync era': 'https://explorer.zksync.io',
   'linea': 'https://lineascan.build',
   'scroll': 'https://scrollscan.com',
   'mantle': 'https://explorer.mantle.xyz',
@@ -64,6 +64,22 @@ export const chainExplorers: Record<string, string> = {
   'celo': 'https://celoscan.io',
   'moonbeam': 'https://moonscan.io',
   'kava': 'https://kavascan.com',
+  'solana': 'https://solscan.io',
+  'sui': 'https://suiscan.xyz',
+  'aptos': 'https://explorer.aptoslabs.com',
+  'tron': 'https://tronscan.org',
+  'cronos': 'https://cronoscan.com',
+  'aurora': 'https://aurorascan.dev',
+  'moonriver': 'https://moonriver.moonscan.io',
+  'harmony': 'https://explorer.harmony.one',
+  'near': 'https://nearblocks.io',
+  'sei': 'https://seitrace.com',
+  'ton': 'https://tonscan.org',
+  'starknet': 'https://starkscan.co',
+  'berachain': 'https://berascan.com',
+  'sonic': 'https://sonicscan.org',
+  'hyperliquid': 'https://hyperliquid.xyz',
+  'monad': 'https://monad.xyz',
 };
 
 // CoinGecko ID mapping for common DeFi tokens
@@ -207,11 +223,13 @@ export function getProtocolUrl(protocol: string, chain?: string): string {
 }
 
 export function getExplorerUrl(chain: string): string {
-  return chainExplorers[chain] || `https://defillama.com/chain/${chain}`;
+  const lowerChain = chain.toLowerCase();
+  return chainExplorers[lowerChain] || `https://defillama.com/chain/${chain}`;
 }
 
 export function getExplorerTokenSearchUrl(chain: string, tokenSymbol: string): string {
-  const explorer = chainExplorers[chain];
+  const lowerChain = chain.toLowerCase();
+  const explorer = chainExplorers[lowerChain];
   if (!explorer) return `https://defillama.com/chain/${chain}`;
 
   // Most explorers support token search
@@ -230,7 +248,8 @@ export function getExplorerTokenSearchUrl(chain: string, tokenSymbol: string): s
 }
 
 export function getTokenUrl(chain: string, tokenAddress?: string): string {
-  const explorer = chainExplorers[chain];
+  const lowerChain = chain.toLowerCase();
+  const explorer = chainExplorers[lowerChain];
   if (!explorer || !tokenAddress) return '';
   return `${explorer}/token/${tokenAddress}`;
 }

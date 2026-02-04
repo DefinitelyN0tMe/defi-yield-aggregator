@@ -101,18 +101,18 @@ func (r *Repository) ListPools(ctx context.Context, filter models.PoolFilter) ([
 	args := []interface{}{}
 	argCount := 0
 
-	// Apply filters
+	// Apply filters (using ILIKE for case-insensitive matching)
 	if filter.Chain != "" {
 		argCount++
-		query += fmt.Sprintf(" AND chain = $%d", argCount)
-		countQuery += fmt.Sprintf(" AND chain = $%d", argCount)
+		query += fmt.Sprintf(" AND LOWER(chain) = LOWER($%d)", argCount)
+		countQuery += fmt.Sprintf(" AND LOWER(chain) = LOWER($%d)", argCount)
 		args = append(args, filter.Chain)
 	}
 
 	if filter.Protocol != "" {
 		argCount++
-		query += fmt.Sprintf(" AND protocol = $%d", argCount)
-		countQuery += fmt.Sprintf(" AND protocol = $%d", argCount)
+		query += fmt.Sprintf(" AND LOWER(protocol) = LOWER($%d)", argCount)
+		countQuery += fmt.Sprintf(" AND LOWER(protocol) = LOWER($%d)", argCount)
 		args = append(args, filter.Protocol)
 	}
 
@@ -121,6 +121,15 @@ func (r *Repository) ListPools(ctx context.Context, filter models.PoolFilter) ([
 		query += fmt.Sprintf(" AND symbol ILIKE $%d", argCount)
 		countQuery += fmt.Sprintf(" AND symbol ILIKE $%d", argCount)
 		args = append(args, "%"+filter.Symbol+"%")
+	}
+
+	// Search across multiple fields (symbol, protocol, chain, pool_meta)
+	if filter.Search != "" {
+		argCount++
+		searchPattern := "%" + filter.Search + "%"
+		query += fmt.Sprintf(" AND (symbol ILIKE $%d OR protocol ILIKE $%d OR chain ILIKE $%d OR pool_meta ILIKE $%d)", argCount, argCount, argCount, argCount)
+		countQuery += fmt.Sprintf(" AND (symbol ILIKE $%d OR protocol ILIKE $%d OR chain ILIKE $%d OR pool_meta ILIKE $%d)", argCount, argCount, argCount, argCount)
+		args = append(args, searchPattern)
 	}
 
 	if !filter.MinAPY.IsZero() {
@@ -746,4 +755,64 @@ func (r *Repository) GetPlatformStats(ctx context.Context) (*models.PlatformStat
 	stats.LastUpdated = time.Now().UTC().Format(time.RFC3339)
 
 	return stats, nil
+}
+
+// =============================================================================
+// Opportunity Write Operations
+// =============================================================================
+
+// UpsertOpportunity inserts or updates an opportunity
+func (r *Repository) UpsertOpportunity(ctx context.Context, opp *models.Opportunity) error {
+	query := `
+		INSERT INTO opportunities (
+			id, type, title, description, source_pool_id, target_pool_id,
+			pool_id, asset, chain, apy_difference, apy_growth, current_apy,
+			potential_profit, tvl, risk_level, score, is_active,
+			detected_at, last_seen_at, expires_at, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+			$13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+		)
+		ON CONFLICT (id) DO UPDATE SET
+			title = EXCLUDED.title,
+			description = EXCLUDED.description,
+			current_apy = EXCLUDED.current_apy,
+			potential_profit = EXCLUDED.potential_profit,
+			tvl = EXCLUDED.tvl,
+			score = EXCLUDED.score,
+			is_active = EXCLUDED.is_active,
+			last_seen_at = EXCLUDED.last_seen_at,
+			updated_at = NOW()
+	`
+
+	_, err := r.pool.Exec(ctx, query,
+		opp.ID, opp.Type, opp.Title, opp.Description,
+		opp.SourcePoolID, opp.TargetPoolID, opp.PoolID,
+		opp.Asset, opp.Chain, opp.APYDifference, opp.APYGrowth,
+		opp.CurrentAPY, opp.PotentialProfit, opp.TVL, opp.RiskLevel,
+		opp.Score, opp.IsActive, opp.DetectedAt, opp.LastSeenAt,
+		opp.ExpiresAt, opp.CreatedAt, opp.UpdatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to upsert opportunity: %w", err)
+	}
+
+	return nil
+}
+
+// DeactivateExpiredOpportunities marks expired opportunities as inactive
+func (r *Repository) DeactivateExpiredOpportunities(ctx context.Context) error {
+	query := `
+		UPDATE opportunities
+		SET is_active = false, updated_at = NOW()
+		WHERE is_active = true AND expires_at < NOW()
+	`
+
+	_, err := r.pool.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to deactivate expired opportunities: %w", err)
+	}
+
+	return nil
 }

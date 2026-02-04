@@ -56,8 +56,9 @@ export function useWebSocket(
           if (message.type === 'opportunity_alert' && onOpportunityAlert && message.data) {
             onOpportunityAlert(message.data as Opportunity);
           }
-        } catch {
-          // Silently ignore parse errors in production
+        } catch (err) {
+          // Log parse errors for debugging
+          console.warn('WebSocket message parse error:', err);
         }
       };
 

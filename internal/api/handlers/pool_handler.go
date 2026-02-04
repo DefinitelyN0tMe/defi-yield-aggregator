@@ -1,13 +1,18 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
 	"github.com/maxjove/defi-yield-aggregator/internal/models"
 )
+
+// Request timeout for database operations
+const requestTimeout = 30 * time.Second
 
 // ListPools returns a paginated list of pools with optional filters
 // @Summary List all pools
@@ -34,7 +39,8 @@ import (
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/pools [get]
 func (h *Handler) ListPools(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), requestTimeout)
+	defer cancel()
 
 	// Parse and validate filter parameters
 	filter, validationErrors := ParsePoolFilter(c)
@@ -54,8 +60,12 @@ func (h *Handler) ListPools(c *fiber.Ctx) error {
 
 	// Fetch from ElasticSearch for fast filtering
 	pools, total, err := h.es.SearchPools(ctx, filter)
-	if err != nil {
-		log.Warn().Err(err).Msg("ElasticSearch query failed, falling back to PostgreSQL")
+	if err != nil || total == 0 {
+		if err != nil {
+			log.Warn().Err(err).Msg("ElasticSearch query failed, falling back to PostgreSQL")
+		} else {
+			log.Debug().Msg("ElasticSearch returned no results, falling back to PostgreSQL")
+		}
 		// Fallback to PostgreSQL
 		pools, total, err = h.pg.ListPools(ctx, filter)
 		if err != nil {
@@ -93,7 +103,8 @@ func (h *Handler) ListPools(c *fiber.Ctx) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/pools/{id} [get]
 func (h *Handler) GetPool(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), requestTimeout)
+	defer cancel()
 	poolID := c.Params("id")
 
 	// Validate pool ID
@@ -137,7 +148,8 @@ func (h *Handler) GetPool(c *fiber.Ctx) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/pools/{id}/history [get]
 func (h *Handler) GetPoolHistory(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), requestTimeout)
+	defer cancel()
 	poolID := c.Params("id")
 	period := c.Query("period", "24h")
 
@@ -172,9 +184,25 @@ func (h *Handler) GetPoolHistory(c *fiber.Ctx) error {
 
 // buildPoolsCacheKey creates a cache key from filter parameters
 func buildPoolsCacheKey(filter models.PoolFilter) string {
-	return fmt.Sprintf("pools:%s:%s:%s:%s:%d:%d",
+	stablecoin := ""
+	if filter.StableCoin != nil {
+		if *filter.StableCoin {
+			stablecoin = "true"
+		} else {
+			stablecoin = "false"
+		}
+	}
+	return fmt.Sprintf("pools:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%d:%d",
 		filter.Chain,
 		filter.Protocol,
+		filter.Symbol,
+		filter.Search,
+		filter.MinAPY.String(),
+		filter.MaxAPY.String(),
+		filter.MinTVL.String(),
+		filter.MaxTVL.String(),
+		filter.MinScore.String(),
+		stablecoin,
 		filter.SortBy,
 		filter.SortOrder,
 		filter.Limit,

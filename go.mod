@@ -1,6 +1,6 @@
 module github.com/maxjove/defi-yield-aggregator
 
-go 1.21
+go 1.23
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.12.0

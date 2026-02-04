@@ -3,7 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { poolsApi } from '../services/api';
 import { APYChart, StatsCard, ExternalLinkIcon, RefreshIcon } from '../components';
-import { getProtocolUrl, getExplorerTokenSearchUrl, defiLlamaLinks, getCoinGeckoUrl, getDexScreenerUrl } from '../utils/links';
+import { getProtocolUrl, getExplorerUrl, defiLlamaLinks, getCoinGeckoUrl, getDexScreenerUrl, getTokenUrl } from '../utils/links';
+
+// Helper to check if a string is an Ethereum address
+const isAddress = (str: string): boolean => /^0x[a-fA-F0-9]{40}$/.test(str);
+
+// Helper to shorten address for display
+const shortenAddress = (addr: string): string => {
+  if (!isAddress(addr)) return addr;
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+};
+
+// Extract primary token symbol from pool symbol (e.g., "WETH-USDC" -> "WETH")
+const getPrimaryToken = (symbol: string): string => {
+  const parts = symbol.split(/[-\/]/);
+  return parts[0] || symbol;
+};
 
 export function PoolDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -157,7 +172,7 @@ export function PoolDetailsPage() {
               DefiLlama
             </a>
             <a
-              href={getExplorerTokenSearchUrl(pool.chain, pool.underlyingTokens[0] || pool.symbol)}
+              href={getExplorerUrl(pool.chain)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg text-sm transition-colors"
@@ -166,7 +181,7 @@ export function PoolDetailsPage() {
               Explorer
             </a>
             <a
-              href={getDexScreenerUrl(pool.underlyingTokens[0] || pool.symbol, pool.chain)}
+              href={getDexScreenerUrl(getPrimaryToken(pool.symbol), pool.chain)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg text-sm transition-colors"
@@ -175,7 +190,7 @@ export function PoolDetailsPage() {
               DexScreener
             </a>
             <a
-              href={getCoinGeckoUrl(pool.underlyingTokens[0] || pool.symbol)}
+              href={getCoinGeckoUrl(getPrimaryToken(pool.symbol))}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg text-sm transition-colors"
@@ -273,14 +288,19 @@ export function PoolDetailsPage() {
                   key={i}
                   className="flex items-center justify-between p-3 bg-dark-800 rounded-lg"
                 >
-                  <span className="text-white font-medium">{token}</span>
+                  <span className="text-white font-medium font-mono text-sm">
+                    {isAddress(token) ? shortenAddress(token) : token}
+                  </span>
                   <a
-                    href={getCoinGeckoUrl(token)}
+                    href={isAddress(token)
+                      ? getTokenUrl(pool.chain, token) || getExplorerUrl(pool.chain)
+                      : getCoinGeckoUrl(token)
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary-400 hover:text-primary-300 text-sm"
                   >
-                    View on CoinGecko →
+                    {isAddress(token) ? 'View on Explorer →' : 'View on CoinGecko →'}
                   </a>
                 </div>
               ))
@@ -302,14 +322,19 @@ export function PoolDetailsPage() {
                   key={i}
                   className="flex items-center justify-between p-3 bg-dark-800 rounded-lg"
                 >
-                  <span className="text-primary-400 font-medium">{token}</span>
+                  <span className="text-primary-400 font-medium font-mono text-sm">
+                    {isAddress(token) ? shortenAddress(token) : token}
+                  </span>
                   <a
-                    href={getCoinGeckoUrl(token)}
+                    href={isAddress(token)
+                      ? getTokenUrl(pool.chain, token) || getExplorerUrl(pool.chain)
+                      : getCoinGeckoUrl(token)
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary-400 hover:text-primary-300 text-sm"
                   >
-                    View on CoinGecko →
+                    {isAddress(token) ? 'View on Explorer →' : 'View on CoinGecko →'}
                   </a>
                 </div>
               ))
@@ -342,7 +367,7 @@ export function PoolDetailsPage() {
             Compare on DefiLlama
           </a>
           <a
-            href={getDexScreenerUrl(pool.underlyingTokens[0] || pool.symbol, pool.chain)}
+            href={getDexScreenerUrl(getPrimaryToken(pool.symbol), pool.chain)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary inline-flex items-center gap-2"
@@ -350,7 +375,7 @@ export function PoolDetailsPage() {
             View on DexScreener
           </a>
           <a
-            href={getCoinGeckoUrl(pool.underlyingTokens[0] || pool.symbol)}
+            href={getCoinGeckoUrl(getPrimaryToken(pool.symbol))}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary inline-flex items-center gap-2"
@@ -358,7 +383,7 @@ export function PoolDetailsPage() {
             View on CoinGecko
           </a>
           <a
-            href={getExplorerTokenSearchUrl(pool.chain, pool.underlyingTokens[0] || pool.symbol)}
+            href={getExplorerUrl(pool.chain)}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary inline-flex items-center gap-2"

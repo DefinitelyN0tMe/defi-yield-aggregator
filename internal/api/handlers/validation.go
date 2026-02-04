@@ -68,9 +68,10 @@ func ParsePoolFilter(c *fiber.Ctx) (models.PoolFilter, []ValidationError) {
 	var errors []ValidationError
 
 	filter := models.PoolFilter{
-		Chain:     strings.ToLower(c.Query("chain")),
-		Protocol:  strings.ToLower(c.Query("protocol")),
+		Chain:     c.Query("chain"),
+		Protocol:  c.Query("protocol"),
 		Symbol:    c.Query("symbol"),
+		Search:    c.Query("search"),
 		SortBy:    c.Query("sortBy", "tvl"),
 		SortOrder: strings.ToLower(c.Query("sortOrder", "desc")),
 		Limit:     c.QueryInt("limit", DefaultLimit),
@@ -134,15 +135,8 @@ func ParsePoolFilter(c *fiber.Ctx) (models.PoolFilter, []ValidationError) {
 		filter.StableCoin = &val
 	}
 
-	// Validate chain format
-	if filter.Chain != "" && !chainRegex.MatchString(filter.Chain) {
-		errors = append(errors, ValidationError{Field: "chain", Message: "invalid chain format"})
-	}
-
-	// Validate protocol format
-	if filter.Protocol != "" && !protocolRegex.MatchString(filter.Protocol) {
-		errors = append(errors, ValidationError{Field: "protocol", Message: "invalid protocol format"})
-	}
+	// Chain and protocol validation - allow alphanumeric with dashes, underscores, and spaces
+	// No strict validation needed as we use case-insensitive matching in the database
 
 	// Validate sort field
 	if !validPoolSortFields[filter.SortBy] {

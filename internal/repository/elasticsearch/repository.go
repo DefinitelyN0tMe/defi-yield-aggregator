@@ -98,8 +98,20 @@ func (r *Repository) createPoolsIndex(ctx context.Context) error {
 		"mappings": {
 			"properties": {
 				"id": { "type": "keyword" },
-				"chain": { "type": "keyword" },
-				"protocol": { "type": "keyword" },
+				"chain": {
+					"type": "text",
+					"analyzer": "lowercase_analyzer",
+					"fields": {
+						"keyword": { "type": "keyword" }
+					}
+				},
+				"protocol": {
+					"type": "text",
+					"analyzer": "lowercase_analyzer",
+					"fields": {
+						"keyword": { "type": "keyword" }
+					}
+				},
 				"symbol": {
 					"type": "text",
 					"analyzer": "lowercase_analyzer",
@@ -256,20 +268,26 @@ func (r *Repository) SearchPools(ctx context.Context, filter models.PoolFilter) 
 func buildPoolSearchQuery(filter models.PoolFilter) map[string]interface{} {
 	must := make([]map[string]interface{}, 0)
 
-	// Chain filter
+	// Chain filter (case-insensitive)
 	if filter.Chain != "" {
 		must = append(must, map[string]interface{}{
-			"term": map[string]interface{}{
-				"chain": filter.Chain,
+			"match": map[string]interface{}{
+				"chain": map[string]interface{}{
+					"query":    strings.ToLower(filter.Chain),
+					"operator": "and",
+				},
 			},
 		})
 	}
 
-	// Protocol filter
+	// Protocol filter (case-insensitive)
 	if filter.Protocol != "" {
 		must = append(must, map[string]interface{}{
-			"term": map[string]interface{}{
-				"protocol": filter.Protocol,
+			"match": map[string]interface{}{
+				"protocol": map[string]interface{}{
+					"query":    strings.ToLower(filter.Protocol),
+					"operator": "and",
+				},
 			},
 		})
 	}
@@ -282,6 +300,18 @@ func buildPoolSearchQuery(filter models.PoolFilter) map[string]interface{} {
 					"query":     filter.Symbol,
 					"fuzziness": "AUTO",
 				},
+			},
+		})
+	}
+
+	// General search across multiple fields
+	if filter.Search != "" {
+		must = append(must, map[string]interface{}{
+			"multi_match": map[string]interface{}{
+				"query":     filter.Search,
+				"fields":    []string{"symbol^3", "protocol^2", "chain", "pool_meta"},
+				"type":      "best_fields",
+				"fuzziness": "AUTO",
 			},
 		})
 	}

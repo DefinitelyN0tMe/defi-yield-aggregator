@@ -45,6 +45,7 @@ type PoolFilter struct {
 	Chain       string          `query:"chain"`       // Filter by blockchain
 	Protocol    string          `query:"protocol"`    // Filter by protocol
 	Symbol      string          `query:"symbol"`      // Filter by symbol (partial match)
+	Search      string          `query:"search"`      // Search across symbol, protocol, chain
 	MinAPY      decimal.Decimal `query:"minApy"`      // Minimum APY threshold
 	MaxAPY      decimal.Decimal `query:"maxApy"`      // Maximum APY threshold
 	MinTVL      decimal.Decimal `query:"minTvl"`      // Minimum TVL threshold

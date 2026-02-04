@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -33,7 +35,8 @@ import (
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/opportunities [get]
 func (h *Handler) ListOpportunities(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+	defer cancel()
 
 	// Parse and validate filter parameters
 	filter, validationErrors := ParseOpportunityFilter(c)
@@ -89,7 +92,8 @@ func (h *Handler) ListOpportunities(c *fiber.Ctx) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/opportunities/trending [get]
 func (h *Handler) GetTrendingPools(c *fiber.Ctx) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+	defer cancel()
 
 	chain := c.Query("chain")
 	minGrowthStr := c.Query("minGrowth", "10")
@@ -162,12 +166,16 @@ type TrendingResponse struct {
 
 // buildOpportunitiesCacheKey creates a cache key for opportunities
 func buildOpportunitiesCacheKey(filter models.OpportunityFilter) string {
-	return fmt.Sprintf("opportunities:%s:%s:%s:%s:%s:%t",
+	return fmt.Sprintf("opportunities:%s:%s:%s:%s:%s:%s:%s:%t:%d:%d",
 		filter.Type,
 		filter.RiskLevel,
 		filter.Chain,
+		filter.Asset,
+		filter.MinProfit.String(),
 		filter.SortBy,
 		filter.SortOrder,
 		filter.ActiveOnly,
+		filter.Limit,
+		filter.Offset,
 	)
 }
